@@ -21,6 +21,7 @@ import torch
 import torch.nn as nn
 import time
 import yaml
+from transforms3d.euler import quat2euler, euler2quat
 
 
 # @dataclass(frozen=True)
@@ -62,11 +63,80 @@ def get_path(path_type: str):
     return start_pos, goal_pos, path, is_loop
 
 
-
-
+# TODO cite racecar
+def get_closest_index(path: np.ndarray, x: float, y: float, start_ind: float, is_loop: bool):
+    best_dist = np.inf
     
+    ind_s = [i for i in range(start_ind)]
+    ind_e = [start_ind + i for i in range(path.shape[1])]
 
+    if not is_loop:
+        indices = ind_e
+    else:
+        indices = [i for a in [ind_e, ind_s] for i in a]
 
+    for i in indices:
+        path_x = path[0, i]
+        path_y = path[1, i]
+
+        dist = np.sqrt((path_x - x)**2 + (path_y - y)**2)
+
+        if dist < best_dist:
+            best_dist = dist
+        else:
+            break
+    return i
+
+def get_horizon_xy(path: np.ndarray, current_index: float, horizon: int):
+    max_index = path.shape[1] - 1
+    
+    if current_index + horizon > max_index:
+        index =  max_index
+    else:
+        index = current_index + horizon
+
+    return np.array([path[0, index], path[1, index]])
+
+def get_robot_xy(env):
+    # Developed based on turtlebot4 _get_odom code
+    # Get current pose
+    pose_stamped = env.sensors.get_latest_pose_stamped()
+    agent_pose = pose_stamped.pose
+
+    # Extract positions
+    agent_x = agent_pose.position.x
+    agent_y = agent_pose.position.y
+
+    # Extract current orientation
+    q = [
+        agent_pose.orientation.w,
+        agent_pose.orientation.x,
+        agent_pose.orientation.y,
+        agent_pose.orientation.z
+    ]
+    _, _, yaw = quat2euler(q, 'sxyz')
+    return np.array([agent_x, agent_y]), yaw
+
+import rclpy
+from rclpy.node import Node
+from nav_msgs.msg import Odometry
+
+class VelocityListener(Node):
+    def __init__(self):
+        super().__init__('velocity_listener')
+
+        self.linear_velocity = 0.0
+
+        self.sub = self.create_subscription(
+            Odometry,
+            '/odom',   # change if needed
+            self.callback,
+            10
+        )
+
+    def callback(self, msg):
+        self.linear_velocity = msg.twist.twist.linear.x
+        # print(f"Linear velocity: {self.linear_velocity:.3f}")
 
 def main():
     print("entered main")
@@ -85,17 +155,22 @@ def main():
     print("loaded_config")
 
     rclpy.init()
-    env=gym.make('Turtlebot4Env-v0')
 
-    start_pos, goal_pos, path = get_path(pid_config["path"])
+    env=gym.make('Turtlebot4Env-v0')
+    print("env made")
+    node = VelocityListener()
+
+    start_pos, goal_pos, path, is_loop = get_path(pid_config["path"])
 
     kp = pid_config["kp"]
     ki = pid_config["ki"]
     kd = pid_config["kd"]
+    speed = pid_config["speed"]
+    horizon = pid_config["horizon"]
 
-
-    state = env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
-    print("env made")
+    env.reset()
+#     state = env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
+    print("env reset")
 
         
     xy_err = [0]
@@ -106,44 +181,44 @@ def main():
     done = False
     
     rewards = []
-    observation, reward, terminated, truncated, info = env.step(np.ndarray([1, 0]))
+    observation, reward, terminated, truncated, info = env.step(np.array([1, 0]))
 
-
-    i = 0
+    curr_index = 0
     while (not terminated):
         # print(i)
-
+        rclpy.spin_once(node, timeout_sec=0)
         
+        xy, yaw = get_robot_xy(env.env.env.env)
 
-        (h_x, h_y) = (x_at_H - np.array([x, y]))
+        closest_path_i = get_closest_index(path, xy[0], xy[1], curr_index, is_loop)
 
-        diff = np.arctan2(h_y, h_x)
+        horizon_xy = get_horizon_xy(path, curr_index, horizon)
+
+        (dx, dy) = (horizon_xy - xy)
+
+        diff = np.arctan2(dy, dx)
         
-        e = diff - psi
-        e = wrap_angle(e)
+        curr_xy_err = diff - yaw
 
-        # if e == 0 or np.linalg.norm([v_x, v_y])<2:
-        #     thrust = 1
-        # else: 
-        thrust = 1*(np.pi/10 - abs(e)) + (speed-v_x)
+        # make sure angle is in the possible range of angles
+        if curr_xy_err > np.pi:
+            curr_xy_err = curr_xy_err - 2*np.pi
+        elif curr_xy_err < -np.pi:
+            curr_xy_err = curr_xy_err + 2*np.pi
 
-        prev = errors[-1]
-        errors.append(e)
+        prev_xy_err = xy_err[-1]
+        xy_err.append(curr_xy_err)
         
-        prev2 = errors_2[-1]
-        errors_2.append(thrust)
-        
+        prev_speed_err = speed_err[-1]
+        curr_speed_err = speed - node.linear_velocity
+        speed_err.append(curr_speed_err)
 
-        steer = kp[0] * e + ki[0] * sum(errors) * 0.05 + kd[0] * (e- prev) / 0.05
-        thrust = kp[1] * (thrust) + ki[1] * sum(errors_2) * 0.05 + kd[0] * (thrust-prev2) /0.05
+        steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
+        thrust = kp[1] * (curr_speed_err) + ki[1] * sum(speed_err) * 0.05 + kd[0] * (curr_speed_err-prev_speed_err) /0.05
  
-        observation, reward, done, _ = rc_env.step([steer, thrust])
-        rewards.append(reward)
-        rc_env.render()
+        observation, reward, terminated, truncated, info = env.step(np.array([steer, thrust]))
 
         
-    print(sum(rewards))
-
     print("done")
     env.close()
 

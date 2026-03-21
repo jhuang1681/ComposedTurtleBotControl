@@ -1,16 +1,11 @@
 <?xml version="1.0" ?>
 <sdf version="1.6">
-  <world name="flat_and_slope_world">
-
-  <!-- This is a comment in XML -->
-
-    <!-- Physics settings -->
+  <world name="static_world">
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
     </physics>
 
-    <!-- Plugins -->
     <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact" />
     <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu" />
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics" />
@@ -18,7 +13,6 @@
     <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors" />
     <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands" />
 
-    <!-- Spherical coordinates (same as before) -->
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <world_frame_orientation>ENU</world_frame_orientation>
@@ -28,7 +22,6 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
 
-    <!-- Sun light -->
     <light type="directional" name="sun">
       <cast_shadows>true</cast_shadows>
       <pose>0 0 10 0 0 0</pose>
@@ -43,15 +36,15 @@
       <direction>-0.5 0.1 -0.9</direction>
     </light>
 
-    <!-- Flat ground -->
-    <model name="flat_ground">
+    <model name="ground_plane">
       <static>true</static>
       <link name="link">
+        <pose>50 0 0 0 0 0</pose>
         <collision name="collision">
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>50 50</size>
+              <size>110 5</size>
             </plane>
           </geometry>
         </collision>
@@ -59,55 +52,16 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>50 50</size>
+              <size>100 100</size>
             </plane>
           </geometry>
           <material>
-            <ambient>0.6 0.6 0.6 1</ambient>
-            <diffuse>0.6 0.6 0.6 1</diffuse>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.8 0.8 0.8 1</specular>
           </material>
         </visual>
       </link>
-    </model>
-
-    <!---
-       Slope Model
-       Rotated plane at 10° (0.1745 rad) pitch along y-axis
-      -->
-    <model name="slope">
-      <static>true</static>
-      <!-- pose: x y z roll pitch yaw -->
-      <link name="link">
-        <pose>25 0 0 0 0.1745 0</pose> <!-- pitched 10° along y-axis (0.1745 rad) -->
-        <collision name="collision">
-          <geometry>
-            <plane>
-              <normal>0 -0.1736 0.9848</normal> <!-- perpendicular to 10° slope -->
-              <size>50 50</size>
-            </plane>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <plane>
-              <normal>0 -0.1736 0.9848</normal>
-              <size>50 50</size>
-            </plane>
-          </geometry>
-          <material>
-            <ambient>0.5 0.5 0.7 1</ambient>
-            <diffuse>0.5 0.5 0.7 1</diffuse>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <!-- Optional included model -->
-    <model name="td7_world">
-      <static>1</static>
-      <include>
-        <uri>model://td7_world</uri>
-      </include>
     </model>
 
   </world>
