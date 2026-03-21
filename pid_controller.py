@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
-
+import pandas as pd
 import rclpy
 # from stable_baselines3 import SAC
 # from stable_baselines3.common.callbacks import (
@@ -22,6 +22,7 @@ import torch.nn as nn
 import time
 import yaml
 from transforms3d.euler import quat2euler, euler2quat
+from get_path import get_path
 
 
 # @dataclass(frozen=True)
@@ -51,16 +52,16 @@ from transforms3d.euler import quat2euler, euler2quat
 #     )
 #     # env = gym.wrappers.FlattenObservation(env)
 
-def get_path(path_type: str):
-    if path_type == "line":
-        start_pos = (0, 0, 0) # (x, y, yaw)
-        goal_pos = (10, 0, 0)
-        path = np.vstack([
-                10 * np.linspace(0, 100, 5000),
-                0 * np.ones(5000)
-            ])
-        is_loop=False
-    return start_pos, goal_pos, path, is_loop
+# def get_path(path_type: str):
+#     if path_type == "line":
+#         start_pos = np.array([0, 0, 0], dtype=np.float64) # (x, y, yaw)
+#         goal_pos = np.array([10, 0, 0], dtype=np.float64)
+#         path = np.vstack([
+#                 10 * np.linspace(0, 100, 5000),
+#                 0 * np.ones(5000)
+#             ])
+#         is_loop=False
+#     return start_pos, goal_pos, path, is_loop
 
 
 # TODO cite racecar
@@ -160,7 +161,7 @@ def main():
     print("env made")
     node = VelocityListener()
 
-    start_pos, goal_pos, path, is_loop = get_path(pid_config["path"])
+    start_pos, goal_pos, path, is_loop = get_path(pid_config["path"], pid_config["slope"])
 
     kp = pid_config["kp"]
     ki = pid_config["ki"]
@@ -168,10 +169,12 @@ def main():
     speed = pid_config["speed"]
     horizon = pid_config["horizon"]
 
-    env.reset()
-#     state = env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
+#     env.reset()
+    state = env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
     print("env reset")
 
+    xy, yaw = get_robot_xy(env.env.env.env)
+    print(xy, yaw)
         
     xy_err = [0]
     xy_prev = 0
@@ -179,11 +182,15 @@ def main():
     speed_err = [0]
     speed_prev=0
     done = False
-    
-    rewards = []
+    x_list = [xy[0]]
+    y_list = [xy[1]]
+    yaw_list = [yaw]
+
+    rewards = [0]
     observation, reward, terminated, truncated, info = env.step(np.array([1, 0]))
 
     curr_index = 0
+    i = 0
     while (not terminated):
         # print(i)
         rclpy.spin_once(node, timeout_sec=0)
@@ -213,12 +220,26 @@ def main():
         curr_speed_err = speed - node.linear_velocity
         speed_err.append(curr_speed_err)
 
+
         steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
         thrust = kp[1] * (curr_speed_err) + ki[1] * sum(speed_err) * 0.05 + kd[0] * (curr_speed_err-prev_speed_err) /0.05
- 
-        observation, reward, terminated, truncated, info = env.step(np.array([steer, thrust]))
+        print(steer, thrust)
+        # observation, reward, terminated, truncated, info = env.step(np.array([steer, thrust]))
+        observation, reward, terminated, truncated, info = env.step(np.array([thrust, steer]))
 
-        
+
+        rewards.append(reward)
+        x_list.append(xy[0])
+        y_list.append(xy[1])
+        yaw_list.append(yaw)
+        i = i+1
+
+        if i > 100:
+            terminated=True
+
+    df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "xy err": xy_err, "speed_err": speed_err, "rewards": rewards})
+    df.to_csv("output.csv")
+    
     print("done")
     env.close()
 

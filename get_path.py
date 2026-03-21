@@ -19,7 +19,7 @@ def get_path(path_type: str, slope: float): # slope in radians
 		t * np.cos(slope),
 		np.sin(t) / 3
 	    ])
-        goal_pos = (10 * np.pi, 0, 0)
+        goal_pos = np.array([10 * np.pi, 0, 0])
         is_loop=False
         
     elif path_type == "tight_sin":
