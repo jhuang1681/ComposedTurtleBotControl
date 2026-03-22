@@ -86,7 +86,7 @@ def get_closest_index(path: np.ndarray, x: float, y: float, start_ind: float, is
             best_dist = dist
         else:
             break
-    return i
+    return i, dist
 
 def get_horizon_xy(path: np.ndarray, current_index: float, horizon: int):
     max_index = path.shape[1] - 1
@@ -122,22 +122,35 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 
-class VelocityListener(Node):
-    def __init__(self):
-        super().__init__('velocity_listener')
+from rclpy.parameter import Parameter
+from rclpy.qos import (
+    QoSDurabilityPolicy,
+    QoSHistoryPolicy,
+    QoSProfile,
+    QoSReliabilityPolicy,
+)
+# class VelocityListener(Node):
+#     def __init__(self):
+#         super().__init__('velocity_listener')
 
-        self.linear_velocity = 0.0
+#         self.linear_velocity = 0.0
 
-        self.sub = self.create_subscription(
-            Odometry,
-            '/odom',   # change if needed
-            self.callback,
-            10
-        )
+#         self.sub = self.create_subscription(
+#             Odometry,
+#             '/odometry/filtered',
+#             self.callback,
+#             QoSProfile(
+#                 depth=1,
+#                 history=QoSHistoryPolicy.KEEP_LAST,
+#                 reliability=QoSReliabilityPolicy.RELIABLE,
+#                 durability=QoSDurabilityPolicy.VOLATILE
+#                 )
+#         )
 
-    def callback(self, msg):
-        self.linear_velocity = msg.twist.twist.linear.x
-        # print(f"Linear velocity: {self.linear_velocity:.3f}")
+#     def callback(self, msg):
+#         print("call?")
+#         self.linear_velocity = msg.twist.twist.linear.x
+#         # print(f"Linear velocity: {self.linear_velocity:.3f}")
 
 def main():
     print("entered main")
@@ -159,7 +172,7 @@ def main():
 
     env=gym.make('Turtlebot4Env-v0')
     print("env made")
-    node = VelocityListener()
+#     node = VelocityListener()
 
     start_pos, goal_pos, path, is_loop = get_path(pid_config["path"], pid_config["slope"])
 
@@ -185,7 +198,9 @@ def main():
     x_list = [xy[0]]
     y_list = [xy[1]]
     yaw_list = [yaw]
+    speed_list = [0]
 
+    dist_err = [0]
     rewards = [0]
     observation, reward, terminated, truncated, info = env.step(np.array([1, 0]))
 
@@ -193,13 +208,16 @@ def main():
     i = 0
     while (not terminated):
         # print(i)
-        rclpy.spin_once(node, timeout_sec=0)
+        # rclpy.spin_once(node, timeout_sec=0.1)
         
         xy, yaw = get_robot_xy(env.env.env.env)
 
-        closest_path_i = get_closest_index(path, xy[0], xy[1], curr_index, is_loop)
+        closest_path_i, dist = get_closest_index(path, xy[0], xy[1], curr_index, is_loop)
 
-        horizon_xy = get_horizon_xy(path, curr_index, horizon)
+        # dist = np.linalg.norm(path[:, closest_path_i] - np.array([[xy[0]], [xy[1]]]))
+        dist_err.append(dist)
+
+        horizon_xy = get_horizon_xy(path, closest_path_i, horizon)
 
         (dx, dy) = (horizon_xy - xy)
 
@@ -217,28 +235,31 @@ def main():
         xy_err.append(curr_xy_err)
         
         prev_speed_err = speed_err[-1]
-        curr_speed_err = speed - node.linear_velocity
+        curr_speed = env.env.env.env.sensors._odom_msg.twist.twist.linear.x
+        curr_speed_err = speed - curr_speed
         speed_err.append(curr_speed_err)
 
 
         steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
-        thrust = kp[1] * (curr_speed_err) + ki[1] * sum(speed_err) * 0.05 + kd[0] * (curr_speed_err-prev_speed_err) /0.05
-        print(steer, thrust)
+        # thrust = kp[1] * (curr_speed_err) + ki[1] * sum(speed_err) * 0.05 + kd[1] * (curr_speed_err-prev_speed_err) /0.05
+        # print(steer, thrust)
         # observation, reward, terminated, truncated, info = env.step(np.array([steer, thrust]))
-        observation, reward, terminated, truncated, info = env.step(np.array([thrust, steer]))
+        observation, reward, terminated, truncated, info = env.step(np.array([speed, steer]))
 
 
         rewards.append(reward)
         x_list.append(xy[0])
         y_list.append(xy[1])
         yaw_list.append(yaw)
+        speed_list.append(curr_speed)
         i = i+1
 
-        if i > 100:
+        if xy[0] - 5 > goal_pos[0] or dist > 1:
             terminated=True
+            print("Failed")
 
-    df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "xy err": xy_err, "speed_err": speed_err, "rewards": rewards})
-    df.to_csv("output.csv")
+    df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "speed": speed_list, "xy_err": dist_err, "yaw_err": xy_err, "speed_err": speed_err, "rewards": rewards})
+    df.to_csv(f"{pid_config["path"]}.csv")
     
     print("done")
     env.close()

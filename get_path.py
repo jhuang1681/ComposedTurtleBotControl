@@ -1,16 +1,16 @@
 import numpy as np
 
-track_len = 500
+track_len = 5000
 
 def get_path(path_type: str, slope: float): # slope in radians
     start_pos = np.array([0, 0, 0], dtype=np.float64) # (x, y, yaw)
     if path_type == "line":
-        t = np.linspace(0, 100, track_len)
+        t = np.linspace(0, 50, track_len)
         path = np.vstack([
                 t * np.cos(slope),
                 0 * np.ones(track_len)
             ])
-        goal_pos = np.array([100, 0, 0], dtype=np.float64)
+        goal_pos = np.array([50, 0, 0], dtype=np.float64)
         is_loop=False
 
     elif path_type == "loose_sin":

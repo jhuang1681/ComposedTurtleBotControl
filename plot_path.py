@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
+import yaml
 from get_path import get_path
 
 print("imports done")
@@ -14,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--path-type")
 parser.add_argument("--slope", type=float)
 parser.add_argument("--data-file")
+parser.add_argument("--yaml")
 args = parser.parse_args()
 
 # Sine curve
@@ -30,13 +32,72 @@ print(len(data))
 # Plot both
 print("plt plotting")
 plt.plot(path[0,:], path[1,:], label="Sine Curve")
-plt.plot(data["x"], data["y"], 'o-', label="CSV Data")
+plt.plot(data["x"], data["y"], 'o-', markersize=2, label="CSV Data")
 
 print("plt plotted")
 
+with open(args.yaml, 'r') as file:
+        pid_config = yaml.safe_load(file)
+
+print("loaded yaml")
+
+kp = pid_config["kp"]
+ki = pid_config["ki"]
+kd = pid_config["kd"]
+
+file_name = f"outputs/{args.path_type}_{kp[0]}_{ki[0]}_{kd[0]}"
 
 plt.legend()
 plt.grid()
 # plt.show()
 print("b4 save fig")
-plt.savefig("course.png")
+plt.savefig(f"{file_name}_path.png")
+
+fig, ax = plt.subplots()
+
+# # Plot both
+print("plt plotting")
+# plt.plot(path[0,:], path[1,:], label="Sine Curve")
+ax.plot(data.index, data["speed"], 'o-', label="err Data")
+
+print("plt plotted")
+
+
+ax.legend()
+ax.grid()
+# plt.show()
+print("b4 save fig")
+fig.savefig(f"{file_name}_speed.png")
+
+fig, ax = plt.subplots()
+
+# Plot both
+print("plt plotting")
+# plt.plot(path[0,:], path[1,:], label="Sine Curve")
+ax.plot(data.index, data["xy_err"], 'o-', markersize=2, label="err Data")
+
+print("plt plotted")
+
+
+ax.legend()
+ax.grid()
+# plt.show()
+print("b4 save fig")
+fig.savefig(f"{file_name}_xy_err.png")
+
+
+# fig, ax = plt.subplots()
+
+
+#  #Plot both
+# print("plt plotting")
+# ax.plot(data.index, data["speed_err"], 'o-', label="speed_err Data")
+
+# print("plt plotted")
+
+
+# ax.legend()
+# ax.grid()
+# # plt.show()
+# print("b4 save fig")
+# fig.savefig(f"{args.path_type}_speed_err.png")

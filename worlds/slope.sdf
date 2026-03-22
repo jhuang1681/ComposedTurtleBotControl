@@ -18,7 +18,7 @@
     <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors" />
     <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands" />
 
-    <!-- Spherical coordinates (same as before) -->
+    <!-- Spherical coordinates (same as before)
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <world_frame_orientation>ENU</world_frame_orientation>
@@ -26,7 +26,7 @@
       <longitude_deg>19.939128</longitude_deg>
       <elevation>0</elevation>
       <heading_deg>0</heading_deg>
-    </spherical_coordinates>
+    </spherical_coordinates> -->
 
     <!-- Sun light -->
     <light type="directional" name="sun">
@@ -51,12 +51,12 @@
     <model name="slope">
       <static>true</static>
       <link name="link">
-        <pose>25 0 0 0 0.1745 0</pose>
+        <pose>0 0 -2 0 0.1745 0</pose>
 
         <collision name="collision">
           <geometry>
             <box>
-              <size>50 50 1.0</size>
+              <size>200 200 0.2</size>
             </box>
           </geometry>
         </collision>
@@ -64,7 +64,7 @@
         <visual name="visual">
           <geometry>
             <box>
-              <size>50 50 1.0</size>
+              <size>200 200 0.2</size>
             </box>
           </geometry>
           <material>
