@@ -169,6 +169,7 @@ def main():
     print("loaded_config")
 
     rclpy.init()
+    print("rclpy init")
 
     env=gym.make('Turtlebot4Env-v0')
     print("env made")
@@ -206,9 +207,11 @@ def main():
 
     curr_index = 0
     i = 0
+    prev_cte = 0.0
     while (not terminated):
+        # alpha = min(i / 10.0, 1.0)
         # print(i)
-        # rclpy.spin_once(node, timeout_sec=0.1)
+        # rclpy.spin_once(node, timeout_sec=0.2)
         
         xy, yaw = get_robot_xy(env.env.env.env)
 
@@ -239,12 +242,23 @@ def main():
         curr_speed_err = speed - curr_speed
         speed_err.append(curr_speed_err)
 
+        cte = -np.sin(yaw) * dx + np.cos(yaw) * dy
 
-        steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
+        # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
+        steer_yaw = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
+        steer_cte =  np.arctan2(kp[1] * cte, curr_speed) + (cte - prev_cte) * kd[1]
+        prev_cte = cte
+        # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + np.arctan2(kp[1] * cte, speed)
+        steer = steer_yaw + steer_cte
+        # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + 0.1 * cte
+
+        # steer = alpha * steer
+        steer = np.clip(steer, -1.0, 1.0)
         # thrust = kp[1] * (curr_speed_err) + ki[1] * sum(speed_err) * 0.05 + kd[1] * (curr_speed_err-prev_speed_err) /0.05
         # print(steer, thrust)
         # observation, reward, terminated, truncated, info = env.step(np.array([steer, thrust]))
         observation, reward, terminated, truncated, info = env.step(np.array([speed, steer]))
+        # observation, reward, terminated, truncated, info = env.step(np.array([thrust, steer]))
 
 
         rewards.append(reward)
