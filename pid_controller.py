@@ -9,13 +9,7 @@ import gymnasium as gym
 import numpy as np
 import pandas as pd
 import rclpy
-# from stable_baselines3 import SAC
-# from stable_baselines3.common.callbacks import (
-#     BaseCallback,
-#     CheckpointCallback,
-#     EvalCallback
-# )
-# from stable_baselines3.common.monitor import Monitor
+
 import tb4_drl_navigation.envs  # noqa: F401
 import torch
 import torch.nn as nn
@@ -24,57 +18,12 @@ import yaml
 from transforms3d.euler import quat2euler, euler2quat
 from get_path import get_path
 
-
-# @dataclass(frozen=True)
-# class EnvConfig:
-#     env_id: str = 'Turtlebot4Env-v0'
-#     world_name: str = 'empty_world'
-#     robot_name: str = 'turtlebot4'
-#     robot_radius: float = 0.3
-
-
-# @dataclass(frozen=True)
-# class PIDConfig:
-#     path: str = 'line'
-#     kp: np.ndarray = np.array([1, 1])
-#     ki: np.ndarray = np.array([0, 0])
-#     kd: np.ndarray = np.array([0, 0])
-#     speed: float = 1
-
-
-
-# def make_env(config: ExperimentConfig) -> gym.Env:
-#     rclpy.init(args=None)
-#     env_params = asdict(config.env)
-#     env = gym.make(
-#         env_params.pop('env_id'),
-#         **env_params
-#     )
-#     # env = gym.wrappers.FlattenObservation(env)
-
-# def get_path(path_type: str):
-#     if path_type == "line":
-#         start_pos = np.array([0, 0, 0], dtype=np.float64) # (x, y, yaw)
-#         goal_pos = np.array([10, 0, 0], dtype=np.float64)
-#         path = np.vstack([
-#                 10 * np.linspace(0, 100, 5000),
-#                 0 * np.ones(5000)
-#             ])
-#         is_loop=False
-#     return start_pos, goal_pos, path, is_loop
-
-
-# TODO cite racecar
-def get_closest_index(path: np.ndarray, x: float, y: float, start_ind: float, is_loop: bool):
+# The closest index and horizon logic is based off of the race car simulator from assignment 2
+# https://github.com/ucsdarclab/RaceCar
+def get_closest_index(path: np.ndarray, x: float, y: float, start_ind: float):
     best_dist = np.inf
     
-    ind_s = [i for i in range(start_ind)]
-    ind_e = [start_ind + i for i in range(path.shape[1])]
-
-    if not is_loop:
-        indices = ind_e
-    else:
-        indices = [i for a in [ind_e, ind_s] for i in a]
+    indices = [start_ind + i for i in range(path.shape[1])]
 
     for i in indices:
         path_x = path[0, i]
@@ -122,35 +71,6 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 
-from rclpy.parameter import Parameter
-from rclpy.qos import (
-    QoSDurabilityPolicy,
-    QoSHistoryPolicy,
-    QoSProfile,
-    QoSReliabilityPolicy,
-)
-# class VelocityListener(Node):
-#     def __init__(self):
-#         super().__init__('velocity_listener')
-
-#         self.linear_velocity = 0.0
-
-#         self.sub = self.create_subscription(
-#             Odometry,
-#             '/odometry/filtered',
-#             self.callback,
-#             QoSProfile(
-#                 depth=1,
-#                 history=QoSHistoryPolicy.KEEP_LAST,
-#                 reliability=QoSReliabilityPolicy.RELIABLE,
-#                 durability=QoSDurabilityPolicy.VOLATILE
-#                 )
-#         )
-
-#     def callback(self, msg):
-#         print("call?")
-#         self.linear_velocity = msg.twist.twist.linear.x
-#         # print(f"Linear velocity: {self.linear_velocity:.3f}")
 
 def main():
     print("entered main")
@@ -173,7 +93,6 @@ def main():
 
     env=gym.make('Turtlebot4Env-v0')
     print("env made")
-#     node = VelocityListener()
 
     start_pos, goal_pos, path, is_loop = get_path(pid_config["path"], pid_config["slope"])
 
@@ -208,6 +127,7 @@ def main():
     curr_index = 0
     i = 0
     prev_cte = 0.0
+    cte_err = []
     while (not terminated):
         # alpha = min(i / 10.0, 1.0)
         # print(i)
@@ -215,7 +135,7 @@ def main():
         
         xy, yaw = get_robot_xy(env.env.env.env)
 
-        closest_path_i, dist = get_closest_index(path, xy[0], xy[1], curr_index, is_loop)
+        closest_path_i, dist = get_closest_index(path, xy[0], xy[1], curr_index)
 
         # dist = np.linalg.norm(path[:, closest_path_i] - np.array([[xy[0]], [xy[1]]]))
         dist_err.append(dist)
@@ -243,17 +163,19 @@ def main():
         speed_err.append(curr_speed_err)
 
         cte = -np.sin(yaw) * dx + np.cos(yaw) * dy
+        cte_err.append(cte-prev_cte)
 
         # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
         steer_yaw = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
-        steer_cte =  np.arctan2(kp[1] * cte, curr_speed) + (cte - prev_cte) * kd[1]
+        steer_cte =  np.arctan2(kp[1] * cte, curr_speed) +  ki[1] * sum(cte_err) + (cte - prev_cte) * kd[1]
         prev_cte = cte
         # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + np.arctan2(kp[1] * cte, speed)
+        # steer_cte=0
         steer = steer_yaw + steer_cte
-        # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + 0.1 * cte
+        print(steer_yaw, steer_cte, steer)# steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + 0.1 * cte
 
         # steer = alpha * steer
-        steer = np.clip(steer, -1.0, 1.0)
+        steer = np.clip(steer, -np.pi/2, np.pi/2)
         # thrust = kp[1] * (curr_speed_err) + ki[1] * sum(speed_err) * 0.05 + kd[1] * (curr_speed_err-prev_speed_err) /0.05
         # print(steer, thrust)
         # observation, reward, terminated, truncated, info = env.step(np.array([steer, thrust]))
