@@ -91,7 +91,9 @@ def main():
     rclpy.init()
     print("rclpy init")
 
-    env=gym.make('Turtlebot4Env-v0')
+    world = args.world
+
+    env=gym.make('Turtlebot4Env-v0', world_name=world, map_path=Path(f"/workspaces/cs558_proj/maps/{world}.pgm"), yaml_path=Path(f"/workspaces/cs558_proj/maps/{world}.yaml"), shuffle_on_reset=False)
     print("env made")
 
     start_pos, goal_pos, path, is_loop = get_path(pid_config["path"], pid_config["slope"])

@@ -1,0 +1,6 @@
+image: flat.pgm
+resolution: 0.05       # 1 pixel = 5 cm
+origin: [-50.0, -50.0, 0.0]  # bottom-left corner of map in world frame
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
