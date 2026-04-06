@@ -124,14 +124,3 @@ RUN PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info[0]}.{sys.
  && [ -d "$tgt" ] && ln -s "$tgt" "/opt/ros/${ROS_DISTRO}/lib/ros_site_packages"
 
 ENV AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS=1
-
-# ENV DISPLAY=:1
-# ENV LIBGL_ALWAYS_SOFTWARE=1
-# ENV MESA_GL_VERSION_OVERRIDE=3.3
-# ENV MESA_GLSL_VERSION_OVERRIDE=330
-
-# # Expose ports: 5901 for VNC, 6080 for noVNC
-# EXPOSE 5901 6080
-
-# CMD vncserver :1 -geometry 1280x800 -depth 24 -SecurityTypes None \
-#     && /usr/share/novnc/utils/launch.sh --vnc localhost:5901 --listen 6080

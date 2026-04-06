@@ -45,7 +45,7 @@ kp = pid_config["kp"]
 ki = pid_config["ki"]
 kd = pid_config["kd"]
 
-file_name = f"outputs/{args.path_type}_{kp[0]}_{ki[0]}_{kd[0]}"
+file_name = f"report_outputs/{args.path_type}_{kp}_{ki}_{kd}_{pid_config["slope"]}_{pid_config["speed"]}"
 
 plt.legend()
 plt.grid()
@@ -58,7 +58,7 @@ fig, ax = plt.subplots()
 # # Plot both
 print("plt plotting")
 # plt.plot(path[0,:], path[1,:], label="Sine Curve")
-ax.plot(data.index, data["speed"], 'o-', label="err Data")
+ax.plot(data.index, data["speed"], 'o-', label="speed")
 
 print("plt plotted")
 
