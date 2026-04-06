@@ -17,14 +17,15 @@
 		"--security-opt=seccomp:unconfined",
 		"--security-opt=apparmor:unconfined",
 		// X11 host
+    		// "--env=DISPLAY=host.docker.internal:0",
 		"--volume=/tmp/.X11-unix:/tmp/.X11-unix:rw",
 		// Wayland host
-		"--volume=/mnt/wslg:/mnt/wslg",
+		// "--volume=/mnt/wslg:/mnt/wslg",
 		"--ipc=host",
 		// uncomment to use intel iGPU
 		// "--device=/dev/dri"
 		// Share user run time settings
-		"--volume=/run/user/1000:/run/user/1000" // Change 1000 to match your UID
+		// "--volume=/run/user/1000:/run/user/1000" // Change 1000 to match your UID
 		// uncomment to use Nvidia GPU with Linux, https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 		// "--runtime=nvidia"
 		// uncomment to use Nvidia GPU with Windows WSL2

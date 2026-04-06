@@ -2,6 +2,8 @@ FROM osrf/ros:jazzy-desktop-full
 
 # Set up dev packages
 ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y python3 python3-pip
+RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN apt-get update \
    && apt-get -y install --no-install-recommends \
     bash-completion \
@@ -13,12 +15,21 @@ RUN apt-get update \
     python3-colcon-common-extensions \
     python3-rosdep \
     python3-vcs2l \
+    xfce4 xfce4-goodies \
+    # tigervnc-standalone-server \
+    # novnc websockify \
+    # supervisor \
     sudo \
     # For GUI
     libx11-xcb1 libxcb1 libxcb-render0 libxcb-shm0 libxcb-xfixes0 libxcb-shape0 \
     libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-util1 \
     libxcb-xinerama0 libxcb-xkb1 libxkbcommon0 libxkbcommon-x11-0 \
     libglu1-mesa libxi6 libsm6 libxrender1 libfontconfig1 \
+    # libgl1-mesa-dri \
+    # mesa-utils \
+    libfreetype6 \
+    libpng16-16 \
+    fontconfig \
    # Clean up
     && apt-get autoremove -y \
     && apt-get clean -y \
@@ -113,3 +124,14 @@ RUN PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info[0]}.{sys.
  && [ -d "$tgt" ] && ln -s "$tgt" "/opt/ros/${ROS_DISTRO}/lib/ros_site_packages"
 
 ENV AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS=1
+
+# ENV DISPLAY=:1
+# ENV LIBGL_ALWAYS_SOFTWARE=1
+# ENV MESA_GL_VERSION_OVERRIDE=3.3
+# ENV MESA_GLSL_VERSION_OVERRIDE=330
+
+# # Expose ports: 5901 for VNC, 6080 for noVNC
+# EXPOSE 5901 6080
+
+# CMD vncserver :1 -geometry 1280x800 -depth 24 -SecurityTypes None \
+#     && /usr/share/novnc/utils/launch.sh --vnc localhost:5901 --listen 6080
