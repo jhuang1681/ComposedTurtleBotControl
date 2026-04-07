@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.6">
-  <world name="flat_and_slope_world">
+  <world name="uphill">
 
   <!-- This is a comment in XML -->
 
@@ -51,7 +51,7 @@
     <model name="slope">
       <static>true</static>
       <link name="link">
-        <pose>0 0 -0.5 0 -0.1745 0</pose>
+        <pose>0 0 -0.2 0 -0.1745 0</pose>
 
         <collision name="collision">
           <geometry>
