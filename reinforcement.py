@@ -160,13 +160,39 @@ def plot_rewards(avg_rewards, title):
     plt.savefig(f'{title}.png')
     plt.show()
 
-def get_features():
-    pass
 
 def get_closest_index(path: np.ndarray, x: float, y: float):
     dist_arr = np.sqrt((path[0, :] - x)**2 + (path[1, :]-y)**2)
     return dist_arr.argmin(), dist_arr.min()
 
+def calculate_curvature(path: np.ndarray, i: int, horizon: int):
+    path_heading_i = np.arctan2(path[1, i+1] - path[1, i-1], path[0, i+1] - path[0, i-1])
+    path_heading_horizon = np.arctan2(path[1, i+horizon+1] - path[1, i + horizon-1], path[0, i+horizon+1] - path[0, i+horizon-1])
+
+    d_heading = path_heading_i - path_heading_horizon
+    if d_heading > np.pi:
+        d_heading = d_heading - 2*np.pi
+    elif d_heading < -np.pi:
+        d_heading = d_heading + 2*np.pi
+
+    dist = np.sqrt((path[0, i + horizon] - path[0, i])**2 + (path[1, i+horizon]-path[1, i])**2)
+
+    return d_heading/dist
+
+def compute_reward(state):
+    cte, heading_err, speed, target_speed, dcte, done_goal = state
+    w = [2, 1, 0.5, 1, 0.5]
+    r_cte = -w[0] * cte**2 # penalize lateral deviation
+    r_heading = -w[1] * heading_err**2 # penalize misalignment
+    # r_speed = -w[2] * (speed - target_speed)**2 # penalize speed deviation
+    # r_progress = w[3]* speed * np.cos(heading_err) # reward forward progress
+    r_dcte = -w[4] * dcte**2 # penalize growing lateral error
+
+    # --- Sparse terminal rewards ---
+    r_goal = +100.0 if done_goal else 0.0
+
+    return r_cte + r_heading + r_dcte + r_goal
+    
 def main():
     print("entered main")
     parser = argparse.ArgumentParser(
@@ -215,14 +241,33 @@ def main():
         ep_Q = []
         ep_R = []
 
-        yaw_err = []
+        yaw_err = [0]
         observation, reward, terminated, truncated, info = env.step(np.array([1, 0]))
         total_steps = 0
+        dist = 0
+        prev_dist = 0
+        dx = 0
+        dy = 0
+        xy, yaw = get_robot_xy(env.env.env.env)
+
         while(not terminated and total_steps < max_steps):
             # return the cte, heading error, curvature, velocity, dcte/dt, lookahead err
-            cte, heading_err, curvature, velocity, dcte_dt, lookahead_err = get_features()
+            xy, yaw = get_robot_xy(env.env.env.env)
+            prev_dist = dist
+            closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
+            horizon_xy = get_horizon_xy(path, closest_path_i, horizon)
 
-            chosen_pid, log_prob = policy.action(torch.FloatTensor([cte, heading_err, curvature, velocity, dcte_dt, lookahead_err, chosen_pid]))
+            (dx, dy) = (horizon_xy - xy)
+            diff = np.arctan2(dy, dx)
+            curr_yaw_err = diff - yaw
+
+            curr_speed = env.env.env.env.sensors._odom_msg.twist.twist.linear.x
+            lookahead_err = -np.sin(yaw) * dx + np.cos(yaw) * dy
+            dcte_dt = (dist - prev_dist)/0.05
+            curvature = calculate_curvature(path, closest_path_i, horizon)
+
+            # cte = dist, heading_err = yaw_err
+            chosen_pid, log_prob = policy.action(torch.FloatTensor([dist, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err, chosen_pid]))
             ep_log_probs.append(log_prob)
 
 
@@ -236,6 +281,7 @@ def main():
 
             while (total_steps % k != 0 and not terminated):
                 xy, yaw = get_robot_xy(env.env.env.env)
+                prev_dist = dist
                 closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
                 horizon_xy = get_horizon_xy(path, closest_path_i, horizon)
 
@@ -257,7 +303,8 @@ def main():
 
                 _, _, terminated, _, _ = env.step(np.array([speed, steer]))
                 total_steps += 1
-                segment_rewards += calculate_reward()
+
+                segment_rewards += compute_reward([dist, curr_yaw_err, curr_speed, speed, dist - prev_dist, terminated])
 
             ep_R.append(segment_rewards)
 
