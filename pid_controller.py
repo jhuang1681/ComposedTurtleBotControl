@@ -24,6 +24,18 @@ def get_closest_index(path: np.ndarray, x: float, y: float, start_ind: float):
     dist_arr = np.sqrt((path[0, :] - x)**2 + (path[1, :]-y)**2)
     return dist_arr.argmin(), dist_arr.min()
 
+#     for i in indices:
+#         path_x = path[0, i]
+#         path_y = path[1, i]
+
+#         dist = np.sqrt((path_x - x)**2 + (path_y - y)**2)
+
+#         if dist < best_dist:
+#             best_dist = dist
+#         else:
+#             break
+#     return i, dist
+
 def get_horizon_xy(path: np.ndarray, current_index: float, horizon: int):
     max_index = path.shape[1] - 1
     
@@ -91,7 +103,6 @@ def main():
     speed = pid_config["speed"]
     horizon = pid_config["horizon"]
 
-#     env.reset()
     state = env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
     print("env reset")
 
@@ -161,7 +172,7 @@ def main():
         # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + np.arctan2(kp[1] * cte, speed)
         # steer_cte=0
         steer = steer_yaw + steer_cte
-        print(steer_yaw, steer_cte, steer)# steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + 0.1 * cte
+        print(speed, steer_yaw, steer_cte, steer)# steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + 0.1 * cte
 
         # steer = alpha * steer
         steer = np.clip(steer, -np.pi/2, np.pi/2)
@@ -186,6 +197,11 @@ def main():
     df.to_csv(f"{pid_config["path"]}.csv")
     
     print("done")
+#     state = env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
+#     print("reset")
+#     for i in range(10):
+#         env.step(np.array([1, 0]))
+#     print("moved 10")
     env.close()
 
 
