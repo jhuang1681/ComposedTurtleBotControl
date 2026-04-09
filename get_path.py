@@ -16,8 +16,17 @@ def get_path(path_type: str, slope: float): # slope in radians
     elif path_type == "loose_sin":
         t = np.linspace(0, 10 * np.pi, track_len)
         path = np.vstack([
-		t * np.cos(slope),
-		np.sin(t) / 3
+            t * np.cos(slope),
+            np.sin(t) / 3
+	    ])
+        goal_pos = np.array([10 * np.pi, 0, 0])
+        is_loop=False
+
+    elif path_type == "mid_sin":
+        t = np.linspace(0, 10 * np.pi, track_len)
+        path = np.vstack([
+            t * np.cos(slope),
+            np.sin(3*t) / 3
 	    ])
         goal_pos = np.array([10 * np.pi, 0, 0])
         is_loop=False
@@ -26,7 +35,7 @@ def get_path(path_type: str, slope: float): # slope in radians
         t = np.linspace(0, 10 * np.pi, track_len)
         path = np.vstack([
 		t * np.cos(slope),
-		5 * np.sin(t)
+		np.sin(5*t)/3
 	    ])
         goal_pos = np.array([10 * np.pi, 0, 0], dtype=np.float64)
         is_loop=False
