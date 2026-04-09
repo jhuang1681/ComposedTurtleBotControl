@@ -36,6 +36,17 @@ def get_path(path_type: str, slope: float): # slope in radians
         path = 10 * np.vstack([np.cos(t), np.sin(t) + 1])
         goal_pos = np.array([0, 0, 0], dtype=np.float64)
         is_loop=True
+
+    elif path_type == "line_par_slope":
+        start_pos = np.array([0, 0, np.pi/2], dtype=np.float64) # (x, y, yaw)
+
+        t = np.linspace(0, 50, track_len)
+        path = np.vstack([
+                0 * np.ones(track_len),
+                t,
+            ])
+        goal_pos = np.array([0, 50, 0], dtype=np.float64)
+        is_loop=False
         
 #     elif path_type == "track": 
     	# start_pos = (0,0,0)

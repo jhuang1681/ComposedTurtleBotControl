@@ -45,7 +45,7 @@ kp = pid_config["kp"]
 ki = pid_config["ki"]
 kd = pid_config["kd"]
 
-file_name = f"report_outputs/{args.path_type}_{kp}_{ki}_{kd}_{pid_config["slope"]}_{pid_config["speed"]}"
+file_name = f"headless_outputs/{args.path_type}_{kp}_{ki}_{kd}_{pid_config["slope"]}_{pid_config["speed"]}"
 
 plt.legend()
 plt.grid()
