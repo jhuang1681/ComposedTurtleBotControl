@@ -1,0 +1,7 @@
+path: "tight_sin"
+slope: 0
+kp: [2.5, 0]
+ki: [0, 0]
+kd: [0.001, 0]
+speed: 0.2
+horizon: 20

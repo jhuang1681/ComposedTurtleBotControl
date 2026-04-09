@@ -8,96 +8,72 @@ import argparse
 import yaml
 from get_path import get_path
 
-print("imports done")
+def plot_path():
+        # Plot both
+
+        plt.plot(path[0,:], path[1,:], label="Sine Curve")
+        plt.plot(data["x"], data["y"], 'o-', markersize=2, label="CSV Data")
+
+        plt.legend()
+        plt.grid()
+        plt.savefig(f"{file_name}_path.png")
+        print("saved path plot")
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--path-type")
-parser.add_argument("--slope", type=float)
-parser.add_argument("--data-file")
-parser.add_argument("--yaml")
-args = parser.parse_args()
+def plot_speed():
+        fig, ax = plt.subplots()
 
-# Sine curve
-print("getting path")
-start, goal, path, is_loop = get_path(args.path_type, args.slope)
-print("path got")
-# CSV data
-data = pd.read_csv(args.data_file)
-print("data got")
+        ax.plot(data.index, data["speed"], 'o-', label="speed")
 
-print(path.shape)
-print(len(data))
+        ax.legend()
+        ax.grid()
+        fig.savefig(f"{file_name}_speed.png")
+        print("saved speed plot")
 
-# Plot both
-print("plt plotting")
-plt.plot(path[0,:], path[1,:], label="Sine Curve")
-plt.plot(data["x"], data["y"], 'o-', markersize=2, label="CSV Data")
+def plot_xy_err():
+        fig, ax = plt.subplots()
+        mse = (data["xy_err"] ** 2).mean()
+        print(mse)
+        ax.text(0.1, 0.9, f"MSE = {mse:.7f}", transform=ax.transAxes)
+        ax.plot(data.index, data["xy_err"], 'o-', markersize=2, label="xy distance err")
+        ax.legend()
+        ax.grid()
+        fig.savefig(f"{file_name}_xy_err.png")
+        print("saved xy err plot")
 
-print("plt plotted")
+def plot_cte_err():
+        fig, ax = plt.subplots()
+        mse = (data["cte_err"] ** 2).mean()
+        ax.text(0.1, 0.9, f"MSE = {mse:.7f}", transform=ax.transAxes)
+        ax.plot(data.index, data["cte_err"], 'o-', markersize=2, label="cte err")
 
-with open(args.yaml, 'r') as file:
-        pid_config = yaml.safe_load(file)
+        ax.legend()
+        ax.grid()
+        fig.savefig(f"{file_name}_xy_cte.png")
+        print("saved cte err plot")
 
-print("loaded yaml")
+if __name__ == '__main__':
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--path-type")
+        parser.add_argument("--slope", type=float)
+        parser.add_argument("--data-file")
+        parser.add_argument("--yaml")
+        args = parser.parse_args()
 
-kp = pid_config["kp"]
-ki = pid_config["ki"]
-kd = pid_config["kd"]
+        start, goal, path, is_loop = get_path(args.path_type, args.slope)
+        data = pd.read_csv(args.data_file)
+        with open(args.yaml, 'r') as file:
+                pid_config = yaml.safe_load(file)
 
-file_name = f"report_outputs/{args.path_type}_{kp}_{ki}_{kd}_{pid_config["slope"]}_{pid_config["speed"]}"
+        # print("loaded yaml")
 
-plt.legend()
-plt.grid()
-# plt.show()
-print("b4 save fig")
-plt.savefig(f"{file_name}_path.png")
+        kp = pid_config["kp"]
+        ki = pid_config["ki"]
+        kd = pid_config["kd"]
 
-fig, ax = plt.subplots()
+        file_name = f"jia_tests/{args.path_type}_{kp}_{ki}_{kd}_{pid_config["horizon"]}_{pid_config["speed"]}"
 
-# # Plot both
-print("plt plotting")
-# plt.plot(path[0,:], path[1,:], label="Sine Curve")
-ax.plot(data.index, data["speed"], 'o-', label="speed")
-
-print("plt plotted")
-
-
-ax.legend()
-ax.grid()
-# plt.show()
-print("b4 save fig")
-fig.savefig(f"{file_name}_speed.png")
-
-fig, ax = plt.subplots()
-
-# Plot both
-print("plt plotting")
-# plt.plot(path[0,:], path[1,:], label="Sine Curve")
-ax.plot(data.index, data["xy_err"], 'o-', markersize=2, label="err Data")
-
-print("plt plotted")
-
-
-ax.legend()
-ax.grid()
-# plt.show()
-print("b4 save fig")
-fig.savefig(f"{file_name}_xy_err.png")
-
-
-# fig, ax = plt.subplots()
-
-
-#  #Plot both
-# print("plt plotting")
-# ax.plot(data.index, data["speed_err"], 'o-', label="speed_err Data")
-
-# print("plt plotted")
-
-
-# ax.legend()
-# ax.grid()
-# # plt.show()
-# print("b4 save fig")
-# fig.savefig(f"{args.path_type}_speed_err.png")
+        plot_path()
+        plot_speed()
+        plot_xy_err()
+        plot_cte_err()
