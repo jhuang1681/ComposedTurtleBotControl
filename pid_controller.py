@@ -1,6 +1,6 @@
 import argparse
 # from dataclasses import asdict, dataclass, field
-# from pathlib import Path
+from pathlib import Path
 # import random
 # import sys
 # from typing import Any, Dict, List, Optional, Tuple
@@ -21,21 +21,8 @@ from get_path import get_path
 # The closest index and horizon logic is based off of the race car simulator from assignment 2
 # https://github.com/ucsdarclab/RaceCar
 def get_closest_index(path: np.ndarray, x: float, y: float, start_ind: float):
-    best_dist = np.inf
-    
-    indices = [start_ind + i for i in range(path.shape[1])]
-
-    for i in indices:
-        path_x = path[0, i]
-        path_y = path[1, i]
-
-        dist = np.sqrt((path_x - x)**2 + (path_y - y)**2)
-
-        if dist < best_dist:
-            best_dist = dist
-        else:
-            break
-    return i, dist
+    dist_arr = np.sqrt((path[0, :] - x)**2 + (path[1, :]-y)**2)
+    return dist_arr.argmin(), dist_arr.min()
 
 def get_horizon_xy(path: np.ndarray, current_index: float, horizon: int):
     max_index = path.shape[1] - 1
@@ -129,7 +116,7 @@ def main():
     curr_index = 0
     i = 0
     prev_cte = 0.0
-    cte_err = []
+    cte_err = [0]
     while (not terminated):
         # alpha = min(i / 10.0, 1.0)
         # print(i)
@@ -184,7 +171,6 @@ def main():
         observation, reward, terminated, truncated, info = env.step(np.array([speed, steer]))
         # observation, reward, terminated, truncated, info = env.step(np.array([thrust, steer]))
 
-
         rewards.append(reward)
         x_list.append(xy[0])
         y_list.append(xy[1])
@@ -196,7 +182,7 @@ def main():
             terminated=True
             print("Failed")
 
-    df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "speed": speed_list, "xy_err": dist_err, "yaw_err": xy_err, "speed_err": speed_err, "rewards": rewards})
+    df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "speed": speed_list, "xy_err": dist_err, "yaw_err": xy_err, "speed_err": speed_err, "rewards": rewards, "cte_err": cte_err})
     df.to_csv(f"{pid_config["path"]}.csv")
     
     print("done")
