@@ -1,9 +1,5 @@
 import argparse
-# from dataclasses import asdict, dataclass, field
 from pathlib import Path
-# import random
-# import sys
-# from typing import Any, Dict, List, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
@@ -11,9 +7,6 @@ import pandas as pd
 import rclpy
 
 import tb4_drl_navigation.envs # noqa: F401
-# import torch
-# import torch.nn as nn
-# import time
 import yaml
 from transforms3d.euler import quat2euler, euler2quat
 from get_path import get_path
@@ -23,18 +16,6 @@ from get_path import get_path
 def get_closest_index(path: np.ndarray, x: float, y: float, start_ind: float):
     dist_arr = np.sqrt((path[0, :] - x)**2 + (path[1, :]-y)**2)
     return dist_arr.argmin(), dist_arr.min()
-
-#     for i in indices:
-#         path_x = path[0, i]
-#         path_y = path[1, i]
-
-#         dist = np.sqrt((path_x - x)**2 + (path_y - y)**2)
-
-#         if dist < best_dist:
-#             best_dist = dist
-#         else:
-#             break
-#     return i, dist
 
 def get_horizon_xy(path: np.ndarray, current_index: float, horizon: int):
     max_index = path.shape[1] - 1
@@ -67,9 +48,6 @@ def get_robot_xy(env):
     return np.array([agent_x, agent_y]), yaw
 
 import rclpy
-# from rclpy.node import Node
-# from nav_msgs.msg import Odometry
-
 
 def main():
     print("entered main")
@@ -129,10 +107,6 @@ def main():
     prev_cte = 0.0
     cte_err = [0]
     while (not terminated):
-        # alpha = min(i / 10.0, 1.0)
-        # print(i)
-        # rclpy.spin_once(node, timeout_sec=0.2)
-        
         xy, yaw = get_robot_xy(env.env.env.env)
 
         closest_path_i, dist = get_closest_index(path, xy[0], xy[1], curr_index)
@@ -176,11 +150,7 @@ def main():
 
         # steer = alpha * steer
         steer = np.clip(steer, -np.pi/2, np.pi/2)
-        # thrust = kp[1] * (curr_speed_err) + ki[1] * sum(speed_err) * 0.05 + kd[1] * (curr_speed_err-prev_speed_err) /0.05
-        # print(steer, thrust)
-        # observation, reward, terminated, truncated, info = env.step(np.array([steer, thrust]))
         observation, reward, terminated, truncated, info = env.step(np.array([speed, steer]))
-        # observation, reward, terminated, truncated, info = env.step(np.array([thrust, steer]))
 
         rewards.append(reward)
         x_list.append(xy[0])
@@ -197,11 +167,6 @@ def main():
     df.to_csv(f"{pid_config["path"]}.csv")
     
     print("done")
-#     state = env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
-#     print("reset")
-#     for i in range(10):
-#         env.step(np.array([1, 0]))
-#     print("moved 10")
     env.close()
 
 
