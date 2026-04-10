@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from torch.distributions import Categorical
 
 import argparse
+from tqdm import tqdm
 
 from get_path import get_path
 from pid_controller import get_horizon_xy, get_robot_xy
@@ -60,8 +61,8 @@ class NN(nn.Module):
 def setup_scenario(ep_idx, total_eps): 
 	# chooses scenario via returning idx for SCENARIO array
 	scenario_idx =  np.random.randint(len(SCENARIOS))
-	if ep_idx < (0.4 * total_eps):
-		scenario_idx = ORDER[ep_idx % len(ORDER)]
+	# if ep_idx < (0.4 * total_eps):
+	# 	scenario_idx = ORDER[ep_idx % len(ORDER)]
 
 	_, _, path = get_path(SCENARIOS[scenario_idx])
 
@@ -76,7 +77,7 @@ def setup_scenario(ep_idx, total_eps):
 	dx = path[0, goal_idx + 1] - path[0, goal_idx]
 	dy = path[1, goal_idx + 1] - path[1, goal_idx]
 	goal_pos = np.array([path[0, goal_idx], path[1, goal_idx], np.arctan2(dy, dx)])
-	print(f"episode:{ep_idx} | scenario: {SCENARIOS[scenario_idx]} | start_pos: {start_pos} | goal_pos:{goal_pos}")
+	# print(f"episode:{ep_idx} | scenario: {SCENARIOS[scenario_idx]} | start_pos: {start_pos} | goal_pos:{goal_pos}")
 	return path, start_pos, goal_pos
 	
 def rewards_to_be(rewards):
@@ -151,12 +152,15 @@ def main():
 	parser.add_argument("--k", type=int, default=10)
 	parser.add_argument("--episodes", type=int, default=200)
 	parser.add_argument("--max-steps", type=int, default=50)
+	parser.add_argument("--checkpoint", type=str, default=None)
 
 	args = parser.parse_args()
 	world = args.world
 	episodes = args.episodes
 	max_steps = args.max_steps
 	k = args.k
+	cp = args.checkpoint
+		
 	print("args parsed")
 
 	pids = []  # list of pid configurations to train RL to choose from
@@ -180,12 +184,27 @@ def main():
 	optimizer = optim.Adam(policy.parameters(), lr=1e-2)
 
 	avg_rewards_per_iteration = []
+	total_ep_rewards = []
 
+	avg_R = 0
 	chosen_pid = -1
-	for e in range(0, episodes):
+	start_e = 0
+	if cp is not None:
+		cp_obj = torch.load(cp, weights_only=False)
+		policy.load_state_dict(cp_obj["model_state_dict"])
+		optimizer.load_state_dict(cp_obj["optimizer_state_dict"])
+		start_e = cp_obj["episodes"]
+		avg_rewards_per_iteration=cp_obj["avg_rewards"]
+		chosen_pid = cp_obj["last_pid"]
+		avg_R = avg_rewards_per_iteration[-1]
+		total_ep_rewards = cp_obj["total_rewards"]
+
+	pbar = tqdm(range(start_e, episodes), desc=f"{avg_R}")
+	for e in pbar:
+		pbar.set_description(f"{avg_R:.3f}")
 		path, start_pos, goal_pos = setup_scenario(e, episodes)
 		env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
-		print("env reset")
+		# print("env reset")
 
 		ep_log_probs = []
 		ep_Q = []
@@ -216,10 +235,10 @@ def main():
 			dcte_dt = (dist - prev_dist)/0.05
 			curvature = calculate_curvature(path, closest_path_i, 50)
 
-			print("choosing pid")
+			# print("choosing pid")
 			chosen_pid, log_prob = policy.action(torch.FloatTensor([dist, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err, chosen_pid]))
 			ep_log_probs.append(log_prob)
-			print("chose pid")
+			# print("chose pid")
 
 
 			kp = pids[chosen_pid]["kp"][0]
@@ -231,7 +250,7 @@ def main():
 			segment_rewards = 0
 
 			while (not terminated and total_steps < max_steps):
-				print("step: ", total_steps)
+				# print("step: ", total_steps)
 				xy, yaw = get_robot_xy(env.env.env.env)
 				prev_dist = dist
 				closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
@@ -280,16 +299,27 @@ def main():
 
 		avg_R = np.mean(ep_R)
 		avg_rewards_per_iteration.append(avg_R)
+		total_ep_rewards.append(sum(ep_R))
 
-		print(f"Episode: {e} | Avg Reward per episode per iteration (update): {avg_R} | loss: {loss.item()}")
+		# print(f"Episode: {e} | Avg Reward per episode per iteration (update): {avg_R} | loss: {loss.item()}")
 
 	env.close()
-	return policy, avg_rewards_per_iteration
+	title = f"episodes:{episodes}-k:{k}-maxsteps:{max_steps}"
+
+	torch.save({
+		"episodes": episodes,
+		"model_state_dict": policy.state_dict(),
+		"optimizer_state_dict": optimizer.state_dict(),
+		"avg_rewards": avg_rewards_per_iteration,
+		"total_rewards": total_ep_rewards,
+		"last_pid": chosen_pid
+		}, f"{title}.pt"
+	)
+	pd.DataFrame({"rewards": avg_rewards_per_iteration}).to_csv(f"{title}.csv")
+	return policy, avg_rewards_per_iteration, title
 
 if __name__ == "__main__":
-	policy, rewards = main()
-	title = f"k:5-episodes:5-maxsteps:10"
-	torch.save(policy.state_dict(), f"{title}.pt")
-	pd.DataFrame({"rewards": rewards}).to_csv(f"{title}.csv")
+	policy, rewards, title = main()
+	
 
 	# plot_rewards(f"{title}.csv", title)
