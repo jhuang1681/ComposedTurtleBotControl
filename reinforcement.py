@@ -64,7 +64,8 @@ def setup_scenario(ep_idx, total_eps):
 	# if ep_idx < (0.4 * total_eps):
 	# 	scenario_idx = ORDER[ep_idx % len(ORDER)]
 
-	_, _, path = get_path(SCENARIOS[scenario_idx])
+	# _, _, path = get_path(SCENARIOS[scenario_idx])
+	_, _, path = get_path("random")
 
 	max_start_idx = int((1.0 - MIN_EP_FRAC) * 5000) # track_len in get_path.py hardcoded as 5000
 	start_idx = np.random.randint(0, max_start_idx)
@@ -187,7 +188,6 @@ def main():
 	total_ep_rewards = []
 
 	avg_R = 0
-	chosen_pid = -1
 	start_e = 0
 	if cp is not None:
 		cp_obj = torch.load(cp, weights_only=False)
@@ -202,6 +202,8 @@ def main():
 	pbar = tqdm(range(start_e, episodes), desc=f"{avg_R}")
 	for e in pbar:
 		pbar.set_description(f"{avg_R:.3f}")
+		chosen_pid = -1
+
 		path, start_pos, goal_pos = setup_scenario(e, episodes)
 		env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
 		# print("env reset")
