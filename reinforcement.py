@@ -60,7 +60,7 @@ class NN(nn.Module):
 	
 def setup_scenario(ep_idx, total_eps): 
 	# chooses scenario via returning idx for SCENARIO array
-	scenario_idx =  np.random.randint(len(SCENARIOS))
+	# scenario_idx =  np.random.randint(len(SCENARIOS))
 	# if ep_idx < (0.4 * total_eps):
 	# 	scenario_idx = ORDER[ep_idx % len(ORDER)]
 

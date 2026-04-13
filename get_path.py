@@ -6,7 +6,10 @@ def get_path(path_type: str):
     start_pos = np.array([0, 0, 0], dtype=np.float64) # (x, y, yaw)
     goal_pos = np.array([10*np.pi], dtype=np.float64)
     t = np.linspace(0, 10*np.pi, track_len)
-    if path_type == "line":
+
+    if path_type == "random":
+        start_pos, goal_pos, path = generate_path(12, 0.05, 0.1)
+    elif path_type == "line":
         path = np.vstack([t, np.zeros(track_len)])
 
     elif path_type == "loose_sin":
@@ -20,9 +23,6 @@ def get_path(path_type: str):
     elif path_type == "tight_sin":
         t = np.linspace(0, 10 * np.pi, track_len)
         path = np.vstack([t, np.sin(5*t) / 3])
-
-    elif path_type == "random":
-        path = generate_path(12, 0.05, 0.1)
         
     # return start_pos, goal_pos, path, is_loop
     return start_pos, goal_pos, path
@@ -37,9 +37,11 @@ def generate_path(num_segments, min_len_frac, max_len_frac):
     seg_pts = (normalized_pts * track_len).astype(int)
     seg_pts[np.argmax(seg_pts)] += track_len - seg_pts.sum()
     for i, num_seg_pts in enumerate(seg_pts):
-        seg_type = np.random.choice(['line', 'mid_sin'])
-        print(seg_type)
-        # t = np.linspace(0, 1, num_seg_pts)
+        if i % 2 == 0:
+            seg_type = 'line'
+        else: seg_type = 'mid_sin'
+        # seg_type = np.random.choice(['line', 'mid_sin'])
+        # print(seg_type)
         if seg_type == 'line':
             length = np.random.uniform(1.0 , 3.0) # TODO: check straight line length
             local_x = np.linspace(0, length, num_seg_pts)
@@ -64,7 +66,7 @@ def generate_path(num_segments, min_len_frac, max_len_frac):
         curr_heading = curr_heading + end_heading_local
 
     path = np.hstack(segments)
-    return path
+    return np.array([path[0,0], path[0,1], 0.0]), np.array([path[-1, 0], path[-1, 1], 0.0]), path
 
 if __name__ == '__main__':
     start, goal, path = get_path("random")
