@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import argparse
 import yaml
 from get_path import get_path
+import torch
 
 def plot_path():
         # Plot both
@@ -52,28 +53,49 @@ def plot_cte_err():
         fig.savefig(f"{file_name}_xy_cte.png")
         print("saved cte err plot")
 
+def plot_reward_from_model(model_name):
+        cp_obj = torch.load(model_name, weights_only=False)
+        ep = cp_obj["episodes"]
+        paths = cp_obj["paths"]
+        paths_t = cp_obj["paths_traveled"]
+
+        for i, path in enumerate(paths):
+                plt.clf()
+                plt.plot(path[0,:], path[1,:], label="Desired path")
+
+                data = np.array(paths_t[i])
+                plt.plot(data[:, 0], data[:, 1], 'o-', markersize=2, label="CSV Data")
+
+                plt.legend()
+                plt.grid()
+                plt.savefig(f"{model_name}_{i}_path.png")
+
 if __name__ == '__main__':
         parser = argparse.ArgumentParser()
         parser.add_argument("--path-type")
         parser.add_argument("--slope", type=float)
         parser.add_argument("--data-file")
         parser.add_argument("--yaml")
+        parser.add_argument("--model-name")
         args = parser.parse_args()
 
-        start, goal, path, is_loop = get_path(args.path_type, args.slope)
-        data = pd.read_csv(args.data_file)
-        with open(args.yaml, 'r') as file:
-                pid_config = yaml.safe_load(file)
+        if args.model_name is None:
+                start, goal, path, is_loop = get_path(args.path_type, args.slope)
+                data = pd.read_csv(args.data_file)
+                with open(args.yaml, 'r') as file:
+                        pid_config = yaml.safe_load(file)
 
-        # print("loaded yaml")
+                # print("loaded yaml")
 
-        kp = pid_config["kp"]
-        ki = pid_config["ki"]
-        kd = pid_config["kd"]
+                kp = pid_config["kp"]
+                ki = pid_config["ki"]
+                kd = pid_config["kd"]
 
-        file_name = f"jia_tests/{args.path_type}_{kp}_{ki}_{kd}_{pid_config["horizon"]}_{pid_config["speed"]}"
+                file_name = f"jia_tests/{args.path_type}_{kp}_{ki}_{kd}_{pid_config["horizon"]}_{pid_config["speed"]}"
 
-        plot_path()
-        plot_speed()
-        plot_xy_err()
-        plot_cte_err()
+                plot_path()
+                plot_speed()
+                plot_xy_err()
+                plot_cte_err()
+        else:
+                plot_reward_from_model(args.model_name)
