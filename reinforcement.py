@@ -58,11 +58,12 @@ class QNet(nn.Module):
     
 def setup_scenario(ep_idx, total_eps): 
     # chooses scenario via returning idx for SCENARIO array
-    scenario_idx =  np.random.randint(len(SCENARIOS))
+    # scenario_idx =  np.random.randint(len(SCENARIOS))
     # if ep_idx < (0.4 * total_eps):
     # 	scenario_idx = ORDER[ep_idx % len(ORDER)]
 
-    _, _, path = get_path(SCENARIOS[scenario_idx])
+    # _, _, path = get_path(SCENARIOS[scenario_idx])
+    _, _, path = get_path("random")
 
     max_start_idx = int((1.0 - MIN_EP_FRAC) * 5000) # track_len in get_path.py hardcoded as 5000
     start_idx = np.random.randint(0, max_start_idx)
