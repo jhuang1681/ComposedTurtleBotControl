@@ -48,10 +48,15 @@ def generate_path(num_segments, min_len_frac, max_len_frac):
             local_y = np.zeros_like(local_x)
             end_heading_local = 0.0
         else:
-            length = np.random.uniform(0.5, 5.0) # TODO: check sine_length
+            # length = np.random.uniform(0.5, 5.0) # TODO: check sine_length
+            length = 3.0
             sign = np.random.choice([-1, 1])
-            local_x = np.linspace(0, length, num_seg_pts)
+            offset = np.random.uniform(0.0, 0.8)
+            local_x = np.linspace(offset, length + offset, num_seg_pts)
             local_y = sign * np.sin(3 * local_x) / 3  
+            
+            local_x = np.linspace(0, length, num_seg_pts)
+            local_y = local_y - local_y[0]
             end_heading_local = 0.0
 
         cos_h = np.cos(curr_heading)
@@ -64,17 +69,22 @@ def generate_path(num_segments, min_len_frac, max_len_frac):
         curr_x = world_x[-1]
         curr_y = world_y[-1]
         curr_heading = curr_heading + end_heading_local
-
     path = np.hstack(segments)
-    return np.array([path[0,0], path[0,1], 0.0]), np.array([path[-1, 0], path[-1, 1], 0.0]), path
+    return np.array([path[0,0], path[1,0], 0.0]), np.array([path[0, -1], path[1, -1], 0.0]), path
 
 if __name__ == '__main__':
+
+    max_start_idx = int((1.0 - 0.2) * 5000) # track_len in get_path.py hardcoded as 5000
+    start_idx = np.random.randint(0, max_start_idx)
+    goal_idx = start_idx + int(0.2 * 5000) 
+
     start, goal, path = get_path("random")
+    print(path[:, start_idx], path[:, goal_idx])
     plt.figure()
     plt.plot(path[0], path[1])
     plt.plot(path[0], path[1])
-    plt.gca().set_aspect('equal', adjustable='datalim')  # expands datalim, not box
+    # plt.gca().set_aspect('equal', adjustable='datalim')  # expands datalim, not box
     plt.grid()
     plt.title("Random piecewise path")
-    plt.show()
+    # plt.show()
     plt.savefig("path_check.png")
