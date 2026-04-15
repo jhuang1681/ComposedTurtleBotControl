@@ -53,6 +53,17 @@ def plot_cte_err():
         fig.savefig(f"{file_name}_xy_cte.png")
         print("saved cte err plot")
 
+def plot_cte():
+        fig, ax = plt.subplots()
+        mse = (data["cte"] ** 2).mean()
+        ax.text(0.1, 0.9, f"MSE = {mse:.7f}", transform=ax.transAxes)
+        ax.plot(data.index, data["cte"], 'o-', markersize=2, label="cte")
+
+        ax.legend()
+        ax.grid()
+        fig.savefig(f"{file_name}_actual_cte.png")
+        print("saved cte plot")
+
 def plot_reward_from_model(model_name):
         cp_obj = torch.load(model_name, weights_only=False)
         ep = cp_obj["episodes"]
@@ -76,8 +87,8 @@ if __name__ == '__main__':
         parser.add_argument("--slope", type=float)
         parser.add_argument("--data-file")
         parser.add_argument("--yaml")
-        parser.add_argument("--model-name")
-        parser.add_argument("--load-path")
+        parser.add_argument("--model-name", type=str, default=None)
+        parser.add_argument("--load-path", type = str, default = None)
         args = parser.parse_args()
 
         if args.model_name is None:
@@ -93,10 +104,12 @@ if __name__ == '__main__':
                 kd = pid_config["kd"]
 
                 file_name = f"{args.path_type}_{kp}_{ki}_{kd}_{pid_config["horizon"]}_{pid_config["speed"]}_{args.load_path}"
-
+                if args.load_path is not None:
+                        file_name=f"{args.load_path}_{args.data_file}"
                 plot_path()
-                plot_speed()
-                plot_xy_err()
-                plot_cte_err()
+                plot_cte()
+                # plot_speed()
+                # plot_xy_err()
+                # plot_cte_err()
         else:
                 plot_reward_from_model(args.model_name)

@@ -10,6 +10,7 @@ import tb4_drl_navigation.envs # noqa: F401
 import yaml
 from transforms3d.euler import quat2euler, euler2quat
 from get_path import get_path
+import time
 
 # The closest index and horizon logic is based off of the race car simulator from assignment 2
 # https://github.com/ucsdarclab/RaceCar
@@ -56,7 +57,7 @@ def main():
     )
     parser.add_argument("--pid-config")
     parser.add_argument("--world")
-
+    parser.add_argument("--load-path", type=str, default=None)
     args = parser.parse_args()
     print("args parsed")
     with open(args.pid_config, 'r') as file:
@@ -73,7 +74,7 @@ def main():
     env=gym.make('Turtlebot4Env-v0', world_name=world, map_path=Path(f"/workspaces/cs558_proj/maps/{world}.pgm"), yaml_path=Path(f"/workspaces/cs558_proj/maps/{world}.yaml"), shuffle_on_reset=False)
     print("env made")
 
-    start_pos, goal_pos, path, is_loop = get_path(pid_config["path"], pid_config["slope"])
+    start_pos, goal_pos, path = get_path(pid_config["path"], args.load_path)
 
     kp = pid_config["kp"]
     ki = pid_config["ki"]
@@ -100,12 +101,14 @@ def main():
 
     dist_err = [0]
     rewards = [0]
+    start = time.time()
     observation, reward, terminated, truncated, info = env.step(np.array([1, 0]))
 
     curr_index = 0
     i = 0
     prev_cte = 0.0
     cte_err = [0]
+    actual_ctes = [0]
     while (not terminated):
         xy, yaw = get_robot_xy(env.env.env.env)
 
@@ -139,6 +142,9 @@ def main():
         cte = -np.sin(yaw) * dx + np.cos(yaw) * dy
         cte_err.append(cte-prev_cte)
 
+        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0)
+        actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
+        actual_ctes.append(actual_cte)
         # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
         steer_yaw = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
         steer_cte =  np.arctan2(kp[1] * cte, curr_speed) +  ki[1] * sum(cte_err) + (cte - prev_cte) * kd[1]
@@ -159,16 +165,16 @@ def main():
         speed_list.append(curr_speed)
         i = i+1
 
-        if xy[0] - 5 > goal_pos[0] or dist > 1:
+        if xy[0] - 5 > goal_pos[0]:
             terminated=True
             print("Failed")
 
-    df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "speed": speed_list, "xy_err": dist_err, "yaw_err": xy_err, "speed_err": speed_err, "rewards": rewards, "cte_err": cte_err})
-    df.to_csv(f"{pid_config["path"]}.csv")
-    
+    df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "speed": speed_list, "xy_err": dist_err, "yaw_err": xy_err, "speed_err": speed_err, "rewards": rewards, "cte_err": cte_err, "cte": actual_ctes})
+    df.to_csv(f"{pid_config["path"]}_{args.load_path}.csv")
     print("done")
     env.close()
-
+    end = time.time()
+    print(end - start)
 
 if __name__ == '__main__':
     main()

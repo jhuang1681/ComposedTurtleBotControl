@@ -8,7 +8,7 @@ import numpy as np
 import argparse
 
 from get_path import get_path
-from pid_controller import get_horizon_xy, get_robot_xy
+from pid_controller import get_robot_xy
 
 from pathlib import Path
 
@@ -94,18 +94,28 @@ def main():
     prev_yaw_err = 0.0
     cte = 0.0
     prev_cte = 0.0
+    actual_ctes = []
+
+    start = time.time()
 
     observation, reward, terminated, truncated, info = env.step(np.array([1, 0]))
     total_steps_in_episode = 0
     curr_ep_reward = 0
     x_list = []
     y_list = []
+    cte_list = []
     while(not terminated):
         # return the cte, heading error, curvature, velocity, dcte/dt, lookahead err
         state = get_state(env, prev_cte, path)
         xy, yaw = get_robot_xy(env.env.env.env)
         x_list.append(xy[0])
         y_list.append(xy[1])
+        cte_list.append(state[0])
+
+        closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
+        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0)
+        actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
+        actual_ctes.append(actual_cte)
         state.append(chosen_pid)
 
         chosen_pid = Q.action(torch.FloatTensor(state))
@@ -121,15 +131,22 @@ def main():
         while (not terminated):
             # print("step: ", total_steps)
             [cte, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err] = get_state(env, prev_cte, path)
+            cte_list.append(cte)
             xy, yaw = get_robot_xy(env.env.env.env)
             x_list.append(xy[0])
             y_list.append(xy[1])
+
+            closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
+            (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0)
+            actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
+            actual_ctes.append(actual_cte)
 
             integral_yaw_err += curr_yaw_err
             steer_yaw = kp * curr_yaw_err + ki * integral_yaw_err * 0.05 + kd * (curr_yaw_err - prev_yaw_err) / 0.05
             steer = np.clip(steer_yaw, -np.pi/2, np.pi/2)
 
             _, _, terminated, _, _ = env.step(np.array([speed, steer]))
+            
             total_steps_in_episode += 1
             step_counter += 1
 
@@ -142,15 +159,20 @@ def main():
         num_segments += 1
         curr_ep_reward += segment_rewards
 
-        # xy, yaw = get_robot_xy(env.env.env.env)
+
+        xy, yaw = get_robot_xy(env.env.env.env)
+
         if xy[0] - 5 > goal_pos[0]:
             terminated=True
             print("Failed")
 
-    df = pd.DataFrame({"x": x_list, "y": y_list})
+
+    df = pd.DataFrame({"x": x_list, "y": y_list, "cte_err": cte_list, "cte": actual_ctes})
     df.to_csv("test_rl_path2.csv")
     print("done")
     env.close()
+    end = time.time()
+    print(end - start)
 
 if __name__ == "__main__":
     main()
