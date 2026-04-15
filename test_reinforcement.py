@@ -2,34 +2,23 @@ import gymnasium as gym
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import copy
 
 import numpy as np
-import matplotlib.pyplot as plt
-from torch.distributions import Categorical
 
 import argparse
-from tqdm import tqdm
 
 from get_path import get_path
 from pid_controller import get_horizon_xy, get_robot_xy
 
-from dataclasses import asdict, dataclass, field
 from pathlib import Path
-import random
-import sys
-from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import rclpy
 
 import tb4_drl_navigation.envs  # noqa: F401
-import time
 import yaml
-from transforms3d.euler import quat2euler, euler2quat
 
-from collections import deque
-from reinforcement import get_path, get_closest_index, get_horizon_xy, get_robot_xy, get_state, compute_reward, calculate_curvature, rewards_to_be
+from reinforcement import get_closest_index, get_state, compute_reward, calculate_curvature
 
 
 class QNet(nn.Module):
@@ -91,8 +80,6 @@ def main():
 
     optimizer = optim.Adam(Q.parameters(), lr=1e-2)
 
-    avg_rewards_per_update = [0]
-    total_ep_rewards = []
     chosen_pid = -1
     step_counter = 0
     if cp is not None:
@@ -103,7 +90,7 @@ def main():
     start_pos, goal_pos, path = get_path("", args.load_path)
     env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
 
-    integral_yaw_err = [0.0]
+    integral_yaw_err = 0.0
     prev_yaw_err = 0.0
     cte = 0.0
     prev_cte = 0.0
@@ -116,12 +103,10 @@ def main():
     while(not terminated):
         # return the cte, heading error, curvature, velocity, dcte/dt, lookahead err
         state = get_state(env, prev_cte, path)
-        xy, yaw = get_robot_xy(env)
+        xy, yaw = get_robot_xy(env.env.env.env)
         x_list.append(xy[0])
         y_list.append(xy[1])
         state.append(chosen_pid)
-
-        prev_state = state
 
         chosen_pid = Q.action(torch.FloatTensor(state))
 
@@ -136,12 +121,12 @@ def main():
         while (not terminated):
             # print("step: ", total_steps)
             [cte, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err] = get_state(env, prev_cte, path)
-            xy, yaw = get_robot_xy(env)
+            xy, yaw = get_robot_xy(env.env.env.env)
             x_list.append(xy[0])
             y_list.append(xy[1])
 
-            integral_yaw_err[chosen_pid] += curr_yaw_err
-            steer_yaw = kp * curr_yaw_err + ki * integral_yaw_err[chosen_pid] * 0.05 + kd * (curr_yaw_err - prev_yaw_err) / 0.05
+            integral_yaw_err += curr_yaw_err
+            steer_yaw = kp * curr_yaw_err + ki * integral_yaw_err * 0.05 + kd * (curr_yaw_err - prev_yaw_err) / 0.05
             steer = np.clip(steer_yaw, -np.pi/2, np.pi/2)
 
             _, _, terminated, _, _ = env.step(np.array([speed, steer]))
@@ -157,12 +142,15 @@ def main():
         num_segments += 1
         curr_ep_reward += segment_rewards
 
-        xy, yaw = get_robot_xy(env)
+        # xy, yaw = get_robot_xy(env.env.env.env)
         if xy[0] - 5 > goal_pos[0]:
             terminated=True
             print("Failed")
 
     df = pd.DataFrame({"x": x_list, "y": y_list})
-    df.to_csv(f"{pid_config["path"]}_{args.load_path}.csv")
+    df.to_csv("test_rl_path2.csv")
     print("done")
     env.close()
+
+if __name__ == "__main__":
+    main()
