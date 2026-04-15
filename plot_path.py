@@ -12,7 +12,7 @@ import torch
 def plot_path():
         # Plot both
 
-        plt.plot(path[0,:], path[1,:], label="Sine Curve")
+        plt.plot(path[0,:], path[1,:], label="Desired Curve")
         plt.plot(data["x"], data["y"], 'o-', markersize=2, label="CSV Data")
 
         plt.legend()
@@ -77,10 +77,11 @@ if __name__ == '__main__':
         parser.add_argument("--data-file")
         parser.add_argument("--yaml")
         parser.add_argument("--model-name")
+        parser.add_argument("--load-path")
         args = parser.parse_args()
 
         if args.model_name is None:
-                start, goal, path, is_loop = get_path(args.path_type, args.slope)
+                start, goal, path = get_path(args.path_type, args.load_path)
                 data = pd.read_csv(args.data_file)
                 with open(args.yaml, 'r') as file:
                         pid_config = yaml.safe_load(file)
@@ -91,7 +92,7 @@ if __name__ == '__main__':
                 ki = pid_config["ki"]
                 kd = pid_config["kd"]
 
-                file_name = f"jia_tests/{args.path_type}_{kp}_{ki}_{kd}_{pid_config["horizon"]}_{pid_config["speed"]}"
+                file_name = f"{args.path_type}_{kp}_{ki}_{kd}_{pid_config["horizon"]}_{pid_config["speed"]}_{args.load_path}"
 
                 plot_path()
                 plot_speed()

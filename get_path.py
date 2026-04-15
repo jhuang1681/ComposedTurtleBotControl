@@ -2,10 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 track_len = 5000
 
-def get_path(path_type: str):
+def get_path(path_type: str, load_path: str = None):
     start_pos = np.array([0, 0, 0], dtype=np.float64) # (x, y, yaw)
     goal_pos = np.array([10*np.pi], dtype=np.float64)
     t = np.linspace(0, 10*np.pi, track_len)
+
+    if (load_path is not None):
+        loaded_path = np.loadtxt(load_path)
+        print("loaded path")
+        return start_pos, np.array([loaded_path[0, -1], loaded_path[1, -1], 0]), loaded_path
+        
 
     if path_type == "random":
         start_pos, goal_pos, path = generate_path(12, 0.05, 0.1)
@@ -23,7 +29,7 @@ def get_path(path_type: str):
     elif path_type == "tight_sin":
         t = np.linspace(0, 10 * np.pi, track_len)
         path = np.vstack([t, np.sin(5*t) / 3])
-        
+
     # return start_pos, goal_pos, path, is_loop
     return start_pos, goal_pos, path
 
