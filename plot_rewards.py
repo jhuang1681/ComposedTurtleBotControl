@@ -53,7 +53,7 @@ if __name__ == "__main__":
 	parser.add_argument("--input", type=str, default="csv")
 	args = parser.parse_args()
 	title = f"episodes:{args.episodes}-k:{args.k}-maxsteps:{args.max_steps}"
-	title = "iter:0-episodes:50-k:5-maxsteps:100"
+	# title = "iter:9-episodes:50-k:5-maxsteps:150"
 	#TODO: add check for if file name of that title exists?
 	
 	if args.input == "csv":

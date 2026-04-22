@@ -4,11 +4,12 @@ import torch.nn as nn
 import torch.optim as optim
 
 import numpy as np
+import time
 
 import argparse
 
 from get_path import get_path
-from pid_controller import get_robot_xy
+from pid_controller import get_robot_xy, get_horizon_xy
 
 from pathlib import Path
 
@@ -104,6 +105,7 @@ def main():
     x_list = []
     y_list = []
     cte_list = []
+    segreward_list = []
     while(not terminated):
         # return the cte, heading error, curvature, velocity, dcte/dt, lookahead err
         state = get_state(env, prev_cte, path)
@@ -116,6 +118,7 @@ def main():
         (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0)
         actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
         actual_ctes.append(actual_cte)
+        segreward_list.append(0.0) 
         state.append(chosen_pid)
 
         chosen_pid = Q.action(torch.FloatTensor(state))
@@ -150,15 +153,15 @@ def main():
             total_steps_in_episode += 1
             step_counter += 1
 
-            segment_rewards += compute_reward([cte, curr_yaw_err, curr_speed, speed, cte - prev_cte, terminated])
+            temp_reward = compute_reward([cte, curr_yaw_err, curr_speed, cte - prev_cte, terminated])
+            segment_rewards += temp_reward
+            segreward_list.append(temp_reward)
             prev_yaw_err = curr_yaw_err
             prev_cte = cte 
             if total_steps_in_episode % k == 0: 
                 break
 
         num_segments += 1
-        curr_ep_reward += segment_rewards
-
 
         xy, yaw = get_robot_xy(env.env.env.env)
 
@@ -167,8 +170,8 @@ def main():
             print("Failed")
 
 
-    df = pd.DataFrame({"x": x_list, "y": y_list, "cte_err": cte_list, "cte": actual_ctes})
-    df.to_csv("test_rl_path2.csv")
+    df = pd.DataFrame({"x": x_list, "y": y_list, "cte_err": cte_list, "cte": actual_ctes, "rewards": segreward_list})
+    df.to_csv("test_rl_path_ddqn2-1.csv")
     print("done")
     env.close()
     end = time.time()
