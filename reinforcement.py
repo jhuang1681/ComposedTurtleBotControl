@@ -70,10 +70,12 @@ class QNet(nn.Module):
         return self.forward(state_t).argmax()
 
 # chooses a random start and goal position from a given path
-def setup_scenario(path): 
-    max_start_idx = int((1.0 - MIN_EP_FRAC) * 5000) # track_len in get_path.py hardcoded as 5000
+def setup_scenario(path, len): 
+    if (len > 5000):
+        len = 5000
+    max_start_idx = int((1.0 - MIN_EP_FRAC) * len) # track_len in get_path.py hardcoded as 5000
     start_idx = np.random.randint(0, max_start_idx)
-    goal_idx = start_idx + int(MIN_EP_FRAC * 5000) # determine goal position 0.2 track length from start
+    goal_idx = start_idx + int(MIN_EP_FRAC * len) - 1 # determine goal position 0.2 track length from start
 
     dx = path[0, start_idx + 1] - path[0, start_idx]
     dy = path[1, start_idx + 1] - path[1, start_idx]
@@ -111,7 +113,7 @@ def calculate_curvature(path: np.ndarray, i: int, horizon: int):
 
     dist = np.sqrt((path[0, horizon_index] - path[0, i])**2 + (path[1, horizon_index]-path[1, i])**2)
 
-    return d_heading/dist
+    return d_heading/(dist +  1e-8)
 
 def compute_reward(state):
     cte, heading_err, speed, dcte, done_goal = state
@@ -131,14 +133,14 @@ def compute_reward(state):
 def get_state(env, prev_cte, path):
     xy, yaw = get_robot_xy(env.env.env.env)
     closest_path_i, cte = get_closest_index(path, xy[0], xy[1])
-    horizon_xy = get_horizon_xy(path, closest_path_i, 50)
+    horizon_xy = get_horizon_xy(path, closest_path_i, 30)
     (dx, dy) = (horizon_xy - xy)
     diff = np.arctan2(dy, dx)
     curr_yaw_err = diff - yaw
     curr_speed = env.env.env.env.sensors._odom_msg.twist.twist.linear.x
     lookahead_err = -np.sin(yaw) * dx + np.cos(yaw) * dy
     dcte_dt = (cte - prev_cte)/0.05
-    curvature = calculate_curvature(path, closest_path_i, 50)
+    curvature = calculate_curvature(path, closest_path_i, 30)
 
     if curr_yaw_err > np.pi:
         curr_yaw_err = curr_yaw_err - 2*np.pi
@@ -153,12 +155,12 @@ def main():
         description='Turtlebot4 Navigation with PID',
     )
     parser.add_argument("--pid-configs", nargs="+")
-    parser.add_argument("--world")
+    parser.add_argument("--world", type=str, default='flat')
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--iter", type=int, default=50)
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--max-steps", type=int, default=50)
-    parser.add_argument("--update_target", type=int, default=500)
+    parser.add_argument("--update_target", type=int, default=800)
     parser.add_argument("--checkpoint", type=str, default=None)
 
     args = parser.parse_args()
@@ -172,6 +174,7 @@ def main():
     epsilon = 1
     epsilon_min = 0.05
     epsilon_decay = 0.99
+    stage_transitions = [2, 4, 6]
         
     print("args parsed")
 
@@ -195,16 +198,17 @@ def main():
     Q = QNet(obs_dim, act_dim)
     Q_fixed = copy.deepcopy(Q)
 
-    replay_buffer = ReplayBuffer(1000)
+    replay_buffer = ReplayBuffer(5000)
 
     optimizer = optim.Adam(Q.parameters(), lr=1e-4)
 
     avg_rewards_per_update = [0]
     total_ep_rewards = []
     chosen_pid = -1
-    start_e = 0
+    # start_e = 0
     start_i = 0
     step_counter = 0
+    # horizon = 30
     if cp is not None:
         cp_obj = torch.load(cp, weights_only=False)
         start_i = cp_obj["iterations"] + 1
@@ -215,25 +219,43 @@ def main():
         avg_rewards_per_update=cp_obj["avg_rewards"]
         total_ep_rewards = cp_obj["total_rewards"]
         chosen_pid = cp_obj["last_pid"]
-        # step_counter = cp_obj["step_counter"]
-        # avg_R = avg_rewards_per_update[-1]
         epsilon = cp_obj["epsilon"]
 
     Q_update_count = 0
     for iter in range(start_i, args.iter):
         # curriculum learning
-        if iter <  args.iter * 0.25:
-            seg_types = ['line', 'loose_sin']
-        elif iter <  args.iter * 0.6:
-            seg_types = ['line', 'loose_sin', 'mid_sin']
+        # if iter < stage_transitions[0]:
+        #     seg_types = ['line'] #curriculum v3
+        #     max_steps = 45
+        # elif iter < stage_transitions[1]:
+        #     seg_types = ['line', 'mid_sin'] #curriculum v3
+        #     # max_steps = 120
+        #     max_steps = args.max_steps
+        # elif iter < stage_transitions[2]:
+        #     seg_types = ['line', 'loose_sin', 'mid_sin'] #curriculum v3
+        #     max_steps = args.max_steps
+        # if iter < stage_transitions[0]:
+        #     seg_types = ['line'] #curriculum v4
+        #     max_steps = 45
+        if iter < stage_transitions[1]:
+            seg_types = ['line', 'tight_sin'] #curriculum v4
+            # max_steps = 120
+            max_steps = args.max_steps
+        elif iter < stage_transitions[2]:
+            seg_types = ['line', 'loose_sin', 'tight_sin'] #curriculum v4
+            max_steps = args.max_steps
         else:
             seg_types = None
-        _, _, path = get_path("random", None, seg_types)
+        _, _, path, tracklen = get_path("random", None, seg_types)
+        if iter in stage_transitions:
+                epsilon = max(epsilon, 0.2)
+                replay_buffer = ReplayBuffer(5000)  # clear old transitions
+                print(f"Curriculum stage change at iter {iter}, epsilon reset", flush=True)
         print(epsilon)
         pbar = tqdm(range(episodes), desc=f"{avg_rewards_per_update[-1]}")
         for e in pbar:
             pbar.set_description(f"Iter {iter}, {avg_rewards_per_update[-1]:.3f}")
-            start_pos, goal_pos = setup_scenario(path)
+            start_pos, goal_pos = setup_scenario(path, tracklen)
             env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
 
             integral_yaw_err = [0.0 for _ in range(len(pids))]
@@ -256,17 +278,17 @@ def main():
                         chosen_pid = np.random.randint(low=0, high=len(pids))
                 else:
                         chosen_pid = Q.action(torch.FloatTensor(state))
-
+                print(pids[chosen_pid]["path"], end=" ")
                 kp = pids[chosen_pid]["kp"][0]
                 ki = pids[chosen_pid]["ki"][0]
                 kd = pids[chosen_pid]["kd"][0]
                 speed = pids[chosen_pid]["speed"]
-                horizon = pids[chosen_pid]["horizon"]
+                # horizon = pids[chosen_pid]["horizon"]
 
                 segment_rewards = 0
                 num_segments = 0
                 while (not terminated and total_steps_in_episode < max_steps):
-                    # print("step: ", total_steps)
+                    # [cte, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err] = get_state(env, prev_cte, path, horizon)
                     [cte, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err] = get_state(env, prev_cte, path)
 
                     integral_yaw_err[chosen_pid] += curr_yaw_err
@@ -324,7 +346,7 @@ def main():
                 if step_counter % update_target > Q_update_count:
                     Q_fixed = copy.deepcopy(Q)
                     Q_update_count += 1
-
+            print(total_steps_in_episode)
             total_ep_rewards.append(curr_ep_reward)
             avg_rewards_per_update.append(curr_ep_reward / num_segments)
             epsilon = max(epsilon_min, epsilon * epsilon_decay)

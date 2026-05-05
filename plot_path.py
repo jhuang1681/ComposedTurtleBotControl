@@ -83,7 +83,7 @@ def plot_reward_from_model(model_name):
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--path-type")
-	parser.add_argument("--slope", type=float)
+	parser.add_argument("--slope", type=float, default=0.0)
 	parser.add_argument("--data-file")
 	parser.add_argument("--yaml")
 	parser.add_argument("--model-name", type=str, default=None)
@@ -91,12 +91,10 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 	if args.model_name is None:
-		start, goal, path = get_path(args.path_type, args.load_path)
+		start, goal, path, _ = get_path(args.path_type, args.load_path)
 		data = pd.read_csv(args.data_file)
 		with open(args.yaml, 'r') as file:
 				pid_config = yaml.safe_load(file)
-
-		# print("loaded yaml")
 
 		kp = pid_config["kp"]
 		ki = pid_config["ki"]
@@ -110,5 +108,8 @@ if __name__ == '__main__':
 			# plot_speed()
 			# plot_xy_err()
 			# plot_cte_err()
+		else:
+			plot_path()
+			plot_cte()
 	else:
 		plot_reward_from_model(args.model_name)

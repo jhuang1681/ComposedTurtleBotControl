@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 def get_path(path_type: str, load_path: str = None, seg_types: list[str] = None):
     track_len = 5000
     start_pos = np.array([0, 0, 0], dtype=np.float64) # (x, y, yaw)
-    goal_pos = np.array([10*np.pi], dtype=np.float64)
+    goal_pos = np.array([10*np.pi,0, 0], dtype=np.float64)
     t = np.linspace(0, 10*np.pi, track_len)
     if (load_path is not None):
         loaded_path = np.loadtxt(load_path)
@@ -41,7 +41,7 @@ def get_path(path_type: str, load_path: str = None, seg_types: list[str] = None)
         t = np.linspace(0, 10 * np.pi, track_len)
         path = np.vstack([t, np.sin(5*t) / 3])
 
-    return start_pos, goal_pos, path
+    return start_pos, goal_pos, path, track_len
 
 def generate_path(seg_types, track_len, num_segments, min_len_frac, max_len_frac):
     print(track_len)
@@ -57,21 +57,16 @@ def generate_path(seg_types, track_len, num_segments, min_len_frac, max_len_frac
     for i, num_seg_pts in enumerate(seg_pts):
         choices = seg_types.copy()
         print(choices)
-        if prev_type is not None:
+        if prev_type is not None and len(choices) > 1:
             choices.remove(prev_type)
         seg_type = np.random.choice(choices)
         prev_type = seg_type
-        # print(seg_type)
         if seg_type == 'line':
             length = np.random.uniform(3.0 , 5.0) # originally 1-3, now 3-5
             local_x = np.linspace(0, length, num_seg_pts)
             local_y = np.zeros_like(local_x)
             end_heading_local = 0.0
         else:
-            # length = 3.0
-            # sign = np.random.choice([-1, 1])
-            # offset = np.random.uniform(0.0, 0.8)
-            # local_x = np.linspace(offset, length + offset, num_seg_pts)
             if seg_type == 'loose_sin':
                 length = 5.0
                 sign = np.random.choice([-1, 1])
@@ -114,6 +109,11 @@ def generate_path(seg_types, track_len, num_segments, min_len_frac, max_len_frac
     path = np.hstack(segments)
     return np.array([path[0,0], path[1,0], 0.0]), np.array([path[0, -1], path[1, -1], 0.0]), path
 
+
+def save_path(path, filename):
+    np.savetxt(filename, path)
+    print(f"Saved path to {filename}")
+
 if __name__ == '__main__':
 
     max_start_idx = int((1.0 - 0.2) * 5000) # track_len in get_path.py hardcoded as 5000
@@ -121,12 +121,12 @@ if __name__ == '__main__':
     goal_idx = start_idx + int(0.2 * 5000) 
 
     start, goal, path = get_path("random")
-    print(path[:, start_idx], path[:, goal_idx])
+    # print(path[:, start_idx], path[:, goal_idx])
     plt.figure()
-    plt.plot(path[0], path[1])
     plt.plot(path[0], path[1])
     # plt.gca().set_aspect('equal', adjustable='datalim')  # expands datalim, not box
     plt.grid()
     plt.title("Random piecewise path")
-    # plt.show()
     plt.savefig("path_check.png")
+
+    save_path(path, "test_path4.txt")
