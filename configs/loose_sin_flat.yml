@@ -1,5 +1,5 @@
 path: "loose_sin"
-slope: 0
+slope: 0.1745
 kp: [1.8, 0]
 ki: [0, 0]
 kd: [0.001, 0]

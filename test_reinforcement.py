@@ -2,13 +2,13 @@ import gymnasium as gym
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
+import time
 import numpy as np
 
 import argparse
 
 from get_path import get_path
-from pid_controller import get_robot_xy
+from pid_controller import get_robot_xy, get_horizon_xy
 
 from pathlib import Path
 
