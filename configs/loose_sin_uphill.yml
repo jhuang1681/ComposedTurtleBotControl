@@ -1,0 +1,7 @@
+path: "loose_sin"
+slope: -0.1745
+kp: [0.005, 0.005]
+ki: [0.08, 0.15]
+kd: [0.005, 0.1]
+speed: 0.5
+horizon: 100
