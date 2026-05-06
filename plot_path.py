@@ -82,10 +82,10 @@ def plot_reward_from_model(model_name):
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--path-type")
+	parser.add_argument("--path-type", type=str, default="")
 	parser.add_argument("--slope", type=float, default=0.0)
 	parser.add_argument("--data-file")
-	parser.add_argument("--yaml")
+	parser.add_argument("--yaml", type=str, default="configs/line.yml")
 	parser.add_argument("--model-name", type=str, default=None)
 	parser.add_argument("--load-path", type = str, default = None)
 	args = parser.parse_args()

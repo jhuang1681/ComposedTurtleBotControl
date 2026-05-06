@@ -11,6 +11,7 @@ import yaml
 from transforms3d.euler import quat2euler, euler2quat
 from get_path import get_path
 import time
+# from reinforcement import compute_reward
 
 # The closest index and horizon logic is based off of the race car simulator from assignment 2
 # https://github.com/ucsdarclab/RaceCar
@@ -48,6 +49,29 @@ def get_robot_xy(env):
     _, _, yaw = quat2euler(q, 'sxyz')
     return np.array([agent_x, agent_y]), yaw
 
+reward_dict = {"running_total": [], "total": [], "r_cte": [], "r_heading": [], "r_dcte": [], "r_speed": [], "r_goal": []}
+def compute_reward(state):
+    cte, heading_err, speed, dcte, done_goal = state
+    w = [2, 0, 0.05, 1, 0.5]
+    r_cte = -w[0] * cte**2 # penalize lateral deviation
+    r_heading = -w[1] * heading_err**2 # penalize misalignment
+
+    r_dcte = -w[4] * dcte**2 # penalize growing lateral error
+
+    # cos(heading_err) reduces reward when pointing wrong direction
+    r_speed = w[2] * speed * np.cos(heading_err) # reward speed (in right direction)
+    # --- Sparse terminal rewards ---
+    r_goal = 10.0 if done_goal else 0.0
+
+    reward_dict["total"].append(r_cte + r_heading + r_dcte + r_speed + r_goal)
+    reward_dict["r_cte"].append(r_cte)
+    reward_dict["r_heading"].append(r_heading)
+    reward_dict["r_dcte"].append(r_dcte)
+    reward_dict["r_speed"].append(r_speed)
+    reward_dict["r_goal"].append(r_goal)
+    reward_dict["running_total"].append(sum(reward_dict["total"]))
+    # print(f"tot: {r_cte + r_heading + r_dcte + r_speed + r_goal}, cte: {r_cte}, head: {r_heading}, dcte: {r_dcte}, speed: {r_speed}, goal: {r_goal}")
+    return r_cte + r_heading + r_dcte + r_speed + r_goal
 import rclpy
 
 def main():
@@ -56,7 +80,7 @@ def main():
         description='Turtlebot4 Navigation with PID',
     )
     parser.add_argument("--pid-config")
-    parser.add_argument("--world")
+    parser.add_argument("--world", type=str, default="flat")
     parser.add_argument("--load-path", type=str, default=None)
     args = parser.parse_args()
     print("args parsed")
@@ -74,7 +98,7 @@ def main():
     env=gym.make('Turtlebot4Env-v0', world_name=world, map_path=Path(f"/workspaces/cs558_proj/maps/{world}.pgm"), yaml_path=Path(f"/workspaces/cs558_proj/maps/{world}.yaml"), shuffle_on_reset=False)
     print("env made")
 
-    start_pos, goal_pos, path = get_path(pid_config["path"], args.load_path)
+    start_pos, goal_pos, path, _ = get_path(pid_config["path"], args.load_path)
 
     kp = pid_config["kp"]
     ki = pid_config["ki"]
@@ -86,7 +110,6 @@ def main():
     print("env reset")
 
     xy, yaw = get_robot_xy(env.env.env.env)
-    print(xy, yaw)
         
     xy_err = [0]
     xy_prev = 0
@@ -147,18 +170,19 @@ def main():
         actual_ctes.append(actual_cte)
         # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
         steer_yaw = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
-        steer_cte =  np.arctan2(kp[1] * cte, curr_speed) +  ki[1] * sum(cte_err) + (cte - prev_cte) * kd[1]
-        prev_cte = cte
-        # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + np.arctan2(kp[1] * cte, speed)
-        # steer_cte=0
-        steer = steer_yaw + steer_cte
-        print(speed, steer_yaw, steer_cte, steer)# steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + 0.1 * cte
+        # steer_cte =  np.arctan2(kp[1] * cte, curr_speed) +  ki[1] * sum(cte_err) + (cte - prev_cte) * kd[1]
+        # prev_cte = cte
+        steer = steer_yaw #+ steer_cte
+        # print(speed, steer_yaw, steer_cte, steer)# steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05 + 0.1 * cte
 
         # steer = alpha * steer
         steer = np.clip(steer, -np.pi/2, np.pi/2)
         observation, reward, terminated, truncated, info = env.step(np.array([speed, steer]))
 
-        rewards.append(reward)
+        dcte = cte - prev_cte
+        pid_reward = compute_reward([dist, curr_xy_err, curr_speed, dcte, terminated])
+        rewards.append(pid_reward)
+        print(sum(rewards))
         x_list.append(xy[0])
         y_list.append(xy[1])
         yaw_list.append(yaw)
@@ -169,12 +193,18 @@ def main():
             terminated=True
             print("Failed")
 
+        if i % 50 == 0:
+            reward_df = pd.DataFrame(reward_dict)
+            reward_df.to_csv("reward_df.csv")
+
     df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "speed": speed_list, "xy_err": dist_err, "yaw_err": xy_err, "speed_err": speed_err, "rewards": rewards, "cte_err": cte_err, "cte": actual_ctes})
     df.to_csv(f"{pid_config["path"]}_{args.load_path}.csv")
     print("done")
     env.close()
     end = time.time()
     print(end - start)
+    reward_df = pd.DataFrame(reward_dict)
+    reward_df.to_csv("reward_df.csv")
 
 if __name__ == '__main__':
     main()

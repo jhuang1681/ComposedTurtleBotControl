@@ -74,13 +74,13 @@ def plot_reward_from_model(model_name, episodes_per_iter):
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--k", type=int)
+	parser.add_argument("--k", type=int, default=5)
 	parser.add_argument("--episodes", type=int)
 	parser.add_argument("--max-steps", type=int)
 	parser.add_argument("--input", type=str, default="csv")
 	args = parser.parse_args()
 	title = f"episodes:{args.episodes}-k:{args.k}-maxsteps:{args.max_steps}"
-	title = "iter:11-episodes:50-k:5-maxsteps:201"
+	title = "iter:9-episodes:50-k:5-maxsteps:201"
 	#TODO: add check for if file name of that title exists?
 	
 	if args.input == "csv":
