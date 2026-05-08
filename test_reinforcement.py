@@ -9,7 +9,7 @@ import time
 import argparse
 
 from get_path import get_path
-from pid_controller import get_robot_xy, get_horizon_xy
+from pid_controller import get_robot_xy, get_horizon_xy, get_closest_index
 
 from pathlib import Path
 
@@ -19,8 +19,26 @@ import rclpy
 import tb4_drl_navigation.envs  # noqa: F401
 import yaml
 
-from reinforcement import get_closest_index, get_state, compute_reward, calculate_curvature
+from reinforcement import compute_reward, calculate_curvature
 
+def get_state(env, prev_cte, path, is_loop=False):
+    xy, yaw = get_robot_xy(env.env.env.env)
+    closest_path_i, cte = get_closest_index(path, xy[0], xy[1], is_loop)
+    horizon_xy = get_horizon_xy(path, closest_path_i, 30, is_loop)
+    (dx, dy) = (horizon_xy - xy)
+    diff = np.arctan2(dy, dx)
+    curr_yaw_err = diff - yaw
+    curr_speed = env.env.env.env.sensors._odom_msg.twist.twist.linear.x
+    lookahead_err = -np.sin(yaw) * dx + np.cos(yaw) * dy
+    dcte_dt = (cte - prev_cte)/0.05
+    curvature = calculate_curvature(path, closest_path_i, 30)
+
+    if curr_yaw_err > np.pi:
+        curr_yaw_err = curr_yaw_err - 2*np.pi
+    elif curr_yaw_err < -np.pi:
+        curr_yaw_err = curr_yaw_err + 2*np.pi
+
+    return [cte, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err]
 
 class QNet(nn.Module):
     def __init__(self, input_size, output_size):
@@ -50,6 +68,7 @@ def main():
     parser.add_argument("--max-steps", type=int, default=50)
     parser.add_argument("--load-path", type=str, default=None)
     parser.add_argument("--cp")
+    parser.add_argument("--is-loop", type=bool, default=False)
 
 
     args = parser.parse_args()
@@ -102,21 +121,25 @@ def main():
     curr_ep_reward = 0
     x_list = []
     y_list = []
+    yaw_list = []
     cte_list = []
     segreward_list = []
-    while(not terminated and total_steps_in_episode < max_steps):
+    closest_path_i = 0
+
+    while(step_counter < max_steps):
         # return the cte, heading error, curvature, velocity, dcte/dt, lookahead err
         state = get_state(env, prev_cte, path)
         xy, yaw = get_robot_xy(env.env.env.env)
-        x_list.append(xy[0])
-        y_list.append(xy[1])
-        cte_list.append(state[0])
+        # x_list.append(xy[0])
+        # y_list.append(xy[1])
+        # yaw_list.append(yaw)
+        # cte_list.append(state[0])
 
-        closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
-        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0) - xy
-        actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
-        actual_ctes.append(actual_cte)
-        segreward_list.append(0.0) 
+        closest_path_i, dist = get_closest_index(path, xy[0], xy[1], closest_path_i, args.is_loop)
+        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0, args.is_loop)
+        actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0 
+        # actual_ctes.append(actual_cte)
+        # segreward_list.append(0.0) 
         state.append(chosen_pid)
 
         chosen_pid = Q.action(torch.FloatTensor(state))
@@ -129,15 +152,16 @@ def main():
 
         segment_rewards = 0
         num_segments = 0
-        while (not terminated):
+        while (step_counter < max_steps):
             [cte, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err] = get_state(env, prev_cte, path)
             cte_list.append(cte)
             xy, yaw = get_robot_xy(env.env.env.env)
             x_list.append(xy[0])
             y_list.append(xy[1])
+            yaw_list.append(yaw)
 
-            closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
-            (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0)
+            closest_path_i, dist = get_closest_index(path, xy[0], xy[1], closest_path_i, args.is_loop)
+            (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0, args.is_loop)
             actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
             actual_ctes.append(actual_cte)
 
@@ -162,14 +186,14 @@ def main():
 
         xy, yaw = get_robot_xy(env.env.env.env)
 
-        if xy[0] - 5 > goal_pos[0]:
-            terminated=True
-            print("Failed")
+        # if xy[0] - 5 > goal_pos[0]:
+        #     terminated=True
+        #     print("Failed")
 
 
-    df = pd.DataFrame({"x": x_list, "y": y_list, "cte_err": cte_list, "cte": actual_ctes, "rewards": segreward_list})
+    df = pd.DataFrame({"x": x_list, "y": y_list, "cte_err": cte_list, "cte": actual_ctes, "rewards": segreward_list, "yaw": yaw_list})
     # df.to_csv("test_rl_path_ddqn_cl4_r2_ms3.csv")
-    df.to_csv("test_rl_path_ddqn_cl4_v5r2_ms3_2.csv")
+    df.to_csv("v4_circle.csv")
     print("done")
     env.close()
     end = time.time()
