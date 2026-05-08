@@ -106,8 +106,7 @@ def main():
     parser.add_argument("--pid-config")
     parser.add_argument("--world", type=str, default="flat")
     parser.add_argument("--load-path", type=str, default=None)
-    parser.add_argument("--min-steps", type=int, default=0)
-    parser.add_argument("--max-steps", type=int, default=None)
+    parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--is-loop", type=bool, default=False)
     args = parser.parse_args()
     print("args parsed")
@@ -121,7 +120,7 @@ def main():
     print("rclpy init")
 
     world = args.world
-    max_steps = args.max_steps
+    num_steps = args.steps
 
     env=gym.make('Turtlebot4Env-v0', world_name=world, map_path=Path(f"/workspaces/cs558_proj/maps/{world}.pgm"), yaml_path=Path(f"/workspaces/cs558_proj/maps/{world}.yaml"), shuffle_on_reset=False, goal_threshold=0.2)
     print("env made")
@@ -134,14 +133,6 @@ def main():
     speed = pid_config["speed"]
     horizon = pid_config["horizon"]
     is_loop = args.is_loop
-    print(args.min_steps)
-    min_steps = 0
-    if args.min_steps > 0:
-        min_steps = args.min_steps
-    max_steps = np.inf
-    print(args.max_steps)
-    if args.max_steps is not None:
-        max_steps = args.max_steps
     
     
     state = env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
@@ -172,7 +163,10 @@ def main():
     actual_ctes = [0]
     total_steps = 0
     closest_path_i = 0
-    while (not terminated and total_steps < max_steps and i < min_steps):
+    
+    if num_steps is not None:
+        terminated = total_steps < num_steps
+    while (not terminated):
         xy, yaw = get_robot_xy(env.env.env.env)
 
         closest_path_i, dist = get_closest_index(path, xy[0], xy[1], closest_path_i, is_loop)
@@ -242,6 +236,9 @@ def main():
         if i % 50 == 0:
             reward_df = pd.DataFrame(reward_dict)
             reward_df.to_csv("reward_df.csv")
+
+        if num_steps is not None:
+            terminated = total_steps < num_steps
 
     df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "speed": speed_list, "xy_err": dist_err, "yaw_err": xy_err, "speed_err": speed_err, "rewards": rewards, "cte_err": cte_err, "cte": actual_ctes})
     df.to_csv(f"{pid_config["path"]}_{args.load_path}.csv")
