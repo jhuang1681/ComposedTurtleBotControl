@@ -22,7 +22,7 @@ To install theTurtlebot simulator
 	./setup.sh
 	./build.sh
 
-	install/local_setup.bash
+	source install/local_setup.bash
 	```
     ** These make ros2 available in the terminal and must be run prior to running any of the simulation or pid control steps.
 
@@ -60,9 +60,9 @@ Run the following simulator command
 ros2 launch tb4_gz_sim simulation.launch.py world:=<path_to_world_sdf>
 ```
 
-where we have the different worlds of uphill, flat, and downhill in the worlds folder.
+We have the different worlds of uphill, flat, and downhill in the worlds folder, but for milestone 2 we decided to focus on only a flat world since the slopes did not make a significant difference.
 
-Choose the path in the config that you would like to use. Ensure the slope corresponds to the world you chose (uphill is -0.1745, downhill is 0.1745, and flat is 0).
+If you would like to run with a slope, choose the path in the config that you would like to use. Ensure the slope corresponds to the world you chose (uphill is -0.1745, downhill is 0.1745, and flat is 0).
 
 In a separate terminal then that in which the simulator is running, within your python environment, run all the Gazebo Turtlebot Environment setup commands. 
 
@@ -70,6 +70,29 @@ Then, run the pid_controller as follows:
 ```
 python pid_controller.py --pid-config <path_to_line_config>
 ```
+
+# Running HRL \(DQN) Training 
+Run the following simulator command:
+```
+ros2 launch tb4_gz_sim simulation.launch.py headless:=True rviz:=False world:=worlds/flat.sdf
+```
+This runs the simulation headless and without visualizations.
+
+In a separate terminal, activate and setup your virtual environment and run the following
+```
+python reinforcement.py --pid-configs <path to each pid config file> --world flat --iter <iteration_num> --episodes <episode_num> --k 5 --max-steps <max_step_num> --update-target 800
+```
+Additionally, to run the training off a previously trained model, you can add the following argument
+```
+--checkpoint <path to model>
+```
+
+The training saves a model and a csv file of rewards through the episodes.
+
+The rewards of the model training can be plotted using `plot_rewards.py`
+
+# Testing 
+To visualize how the robot follows a trajectory, either run `pid_controller.py` with a given pid config or `test_reinforcement.py` with a model. Both will return a csv file of position. These can be plotted using `plot_path.py`.
 
 
 
