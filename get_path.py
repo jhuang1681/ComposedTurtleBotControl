@@ -10,7 +10,7 @@ def get_path(path_type: str, load_path: str = None, seg_types: list[str] = None)
     if (load_path is not None):
         loaded_path = np.loadtxt(load_path)
         print("loaded path")
-        return start_pos, np.array([loaded_path[0, -1], loaded_path[1, -1], 0]), loaded_path
+        return start_pos, np.array([loaded_path[0, -1], loaded_path[1, -1], 0]), loaded_path, len(loaded_path[0])
         
 
     if path_type == "random":
