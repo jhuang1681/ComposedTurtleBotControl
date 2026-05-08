@@ -85,7 +85,8 @@ def compute_reward(state):
     # cos(heading_err) reduces reward when pointing wrong direction
     r_speed = w[2] * speed * np.cos(heading_err) # reward speed (in right direction)
     # --- Sparse terminal rewards ---
-    r_goal = 0 #10.0 if done_goal else 0.0
+    r_goal = 10.0 if done_goal else 0.0
+    # r_goal = 0 #10.0 if done_goal else 0.0
 
     reward_dict["total"].append(r_cte + r_heading + r_dcte + r_speed + r_goal)
     reward_dict["r_cte"].append(r_cte)
@@ -108,6 +109,7 @@ def main():
     parser.add_argument("--load-path", type=str, default=None)
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--is-loop", type=bool, default=False)
+    parser.add_argument("--use-terminate", type=bool, default=True)
     args = parser.parse_args()
     print("args parsed")
     with open(args.pid_config, 'r') as file:
@@ -170,7 +172,7 @@ def main():
         xy, yaw = get_robot_xy(env.env.env.env)
 
         closest_path_i, dist = get_closest_index(path, xy[0], xy[1], closest_path_i, is_loop)
-        print(path[:, closest_path_i], dist, xy)
+        # print(path[:, closest_path_i], dist, xy)
         # dist = np.linalg.norm(path[:, closest_path_i] - np.array([[xy[0]], [xy[1]]]))
         dist_err.append(dist)
 
@@ -199,7 +201,7 @@ def main():
         cte = -np.sin(yaw) * dx + np.cos(yaw) * dy
         cte_err.append(cte-prev_cte)
 
-        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0, is_loop)
+        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0, is_loop) - xy
         actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
         actual_ctes.append(actual_cte)
         # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
@@ -238,7 +240,10 @@ def main():
             reward_df.to_csv("reward_df.csv")
 
         if num_steps is not None:
-            terminated = total_steps >= num_steps
+            if args.use_terminate:
+                terminated = (total_steps>=num_steps) or terminated
+            else:
+                terminated = total_steps >= num_steps
 
     df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "speed": speed_list, "xy_err": dist_err, "yaw_err": xy_err, "speed_err": speed_err, "rewards": rewards, "cte_err": cte_err, "cte": actual_ctes})
     df.to_csv(f"{pid_config["path"]}_{args.load_path}.csv")
