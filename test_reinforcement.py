@@ -102,6 +102,7 @@ def main():
     curr_ep_reward = 0
     x_list = []
     y_list = []
+    yaw_list = []
     cte_list = []
     segreward_list = []
     while(not terminated and total_steps_in_episode < max_steps):
@@ -110,11 +111,12 @@ def main():
         xy, yaw = get_robot_xy(env.env.env.env)
         x_list.append(xy[0])
         y_list.append(xy[1])
+        yaw_list.append(yaw)
         cte_list.append(state[0])
 
         closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
         (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0)
-        actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
+        actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0 
         actual_ctes.append(actual_cte)
         segreward_list.append(0.0) 
         state.append(chosen_pid)
@@ -135,6 +137,7 @@ def main():
             xy, yaw = get_robot_xy(env.env.env.env)
             x_list.append(xy[0])
             y_list.append(xy[1])
+            yaw_list.append(yaw)
 
             closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
             (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0)
@@ -167,9 +170,9 @@ def main():
             print("Failed")
 
 
-    df = pd.DataFrame({"x": x_list, "y": y_list, "cte_err": cte_list, "cte": actual_ctes, "rewards": segreward_list})
+    df = pd.DataFrame({"x": x_list, "y": y_list, "cte_err": cte_list, "cte": actual_ctes, "rewards": segreward_list, "yaw": yaw_list})
     # df.to_csv("test_rl_path_ddqn_cl4_r2_ms3.csv")
-    df.to_csv("test_rl_path_ddqn_cl4_v5r2_ms3_2.csv")
+    df.to_csv("test_rl_path_ddqn_cl4_v3_ms1000_p1.csv")
     print("done")
     env.close()
     end = time.time()
