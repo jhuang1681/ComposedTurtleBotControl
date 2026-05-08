@@ -113,7 +113,7 @@ def main():
         cte_list.append(state[0])
 
         closest_path_i, dist = get_closest_index(path, xy[0], xy[1])
-        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0)
+        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0) - xy
         actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
         actual_ctes.append(actual_cte)
         segreward_list.append(0.0) 
