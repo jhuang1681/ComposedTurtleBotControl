@@ -21,9 +21,9 @@ import yaml
 
 from reinforcement import compute_reward, calculate_curvature
 
-def get_state(env, prev_cte, path, is_loop=False):
+def get_state(env, prev_cte, path, closest_path_i, is_loop=False):
     xy, yaw = get_robot_xy(env.env.env.env)
-    closest_path_i, cte = get_closest_index(path, xy[0], xy[1], is_loop)
+    closest_path_i, cte = get_closest_index(path, xy[0], xy[1], closest_path_i, is_loop)
     horizon_xy = get_horizon_xy(path, closest_path_i, 30, is_loop)
     (dx, dy) = (horizon_xy - xy)
     diff = np.arctan2(dy, dx)
@@ -128,7 +128,7 @@ def main():
 
     while(step_counter < max_steps):
         # return the cte, heading error, curvature, velocity, dcte/dt, lookahead err
-        state = get_state(env, prev_cte, path)
+        state = get_state(env, prev_cte, path, closest_path_i, args.is_loop)
         xy, yaw = get_robot_xy(env.env.env.env)
         # x_list.append(xy[0])
         # y_list.append(xy[1])
@@ -153,7 +153,7 @@ def main():
         segment_rewards = 0
         num_segments = 0
         while (step_counter < max_steps):
-            [cte, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err] = get_state(env, prev_cte, path)
+            [cte, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err] = get_state(env, prev_cte, path, closest_path_i, args.is_loop)
             cte_list.append(cte)
             xy, yaw = get_robot_xy(env.env.env.env)
             x_list.append(xy[0])
