@@ -163,9 +163,9 @@ def main():
     actual_ctes = [0]
     total_steps = 0
     closest_path_i = 0
-    
+
     if num_steps is not None:
-        terminated = total_steps < num_steps
+        terminated = total_steps >= num_steps
     while (not terminated):
         xy, yaw = get_robot_xy(env.env.env.env)
 
@@ -223,9 +223,9 @@ def main():
         speed_list.append(curr_speed)
         i = i+1
 
-        if dist > 0.5:
-            print("failed!")
-            break
+        # if dist > 0.5:
+        #     print("failed!")
+        #     break
         # if i == max_steps:
         #     print("max reached")
         #     break
@@ -238,7 +238,7 @@ def main():
             reward_df.to_csv("reward_df.csv")
 
         if num_steps is not None:
-            terminated = total_steps < num_steps
+            terminated = total_steps >= num_steps
 
     df = pd.DataFrame({"x": x_list, "y": y_list, "yaw": yaw_list, "speed": speed_list, "xy_err": dist_err, "yaw_err": xy_err, "speed_err": speed_err, "rewards": rewards, "cte_err": cte_err, "cte": actual_ctes})
     df.to_csv(f"{pid_config["path"]}_{args.load_path}.csv")
