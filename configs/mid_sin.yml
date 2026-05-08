@@ -1,7 +1,6 @@
 path: "mid_sin"
-slope: 0
-kp: [1.8, 0]
-ki: [0, 0]
-kd: [0.001, 0]
+kp: [1.8]
+ki: [0]
+kd: [0.001]
 speed: 0.35
 horizon: 60

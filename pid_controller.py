@@ -76,7 +76,7 @@ def get_robot_xy(env):
 reward_dict = {"running_total": [], "total": [], "r_cte": [], "r_heading": [], "r_dcte": [], "r_speed": [], "r_goal": []}
 def compute_reward(state):
     cte, heading_err, speed, dcte, done_goal = state
-    w = [2, 0, 0.05, 1, 0.5]
+    w = [4, 0, 0.05, 1, 0.5]
     r_cte = -w[0] * cte**2 # penalize lateral deviation
     r_heading = -w[1] * heading_err**2 # penalize misalignment
 
@@ -121,6 +121,7 @@ def main():
     print("rclpy init")
 
     world = args.world
+    max_steps = args.max_steps
 
     env=gym.make('Turtlebot4Env-v0', world_name=world, map_path=Path(f"/workspaces/cs558_proj/maps/{world}.pgm"), yaml_path=Path(f"/workspaces/cs558_proj/maps/{world}.yaml"), shuffle_on_reset=False, goal_threshold=0.2)
     print("env made")
@@ -169,8 +170,9 @@ def main():
     prev_cte = 0.0
     cte_err = [0]
     actual_ctes = [0]
+    total_steps = 0
     closest_path_i = 0
-    while (i < min_steps):
+    while (not terminated and total_steps < max_steps and i < min_steps):
         xy, yaw = get_robot_xy(env.env.env.env)
 
         closest_path_i, dist = get_closest_index(path, xy[0], xy[1], closest_path_i, is_loop)
@@ -216,7 +218,7 @@ def main():
         # steer = alpha * steer
         steer = np.clip(steer, -np.pi/2, np.pi/2)
         observation, reward, terminated, truncated, info = env.step(np.array([speed, steer]))
-
+        total_steps +=1
         dcte = cte - prev_cte
         pid_reward = compute_reward([dist, curr_xy_err, curr_speed, dcte, terminated])
         rewards.append(pid_reward)

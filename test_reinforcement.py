@@ -45,18 +45,16 @@ def main():
         description='Turtlebot4 Navigation with PID',
     )
     parser.add_argument("--pid-configs", nargs="+")
-    parser.add_argument("--world")
+    parser.add_argument("--world", type=str, default="flat")
     parser.add_argument("--k", type=int, default=5)
-    # parser.add_argument("--episodes", type=int, default=100)
-    # parser.add_argument("--max-steps", type=int, default=50)
+    parser.add_argument("--max-steps", type=int, default=50)
     parser.add_argument("--load-path", type=str, default=None)
     parser.add_argument("--cp")
 
 
     args = parser.parse_args()
     world = args.world
-    # episodes = args.episodes
-    # max_steps = args.max_steps
+    max_steps = args.max_steps
     k = args.k
     cp = args.cp
 
@@ -88,7 +86,7 @@ def main():
         Q.load_state_dict(cp_obj["model_state_dict"])
         optimizer.load_state_dict(cp_obj["optimizer_state_dict"])
 
-    start_pos, goal_pos, path = get_path("", args.load_path)
+    start_pos, goal_pos, path, _ = get_path("", args.load_path)
     env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
 
     integral_yaw_err = 0.0
@@ -106,7 +104,7 @@ def main():
     y_list = []
     cte_list = []
     segreward_list = []
-    while(not terminated):
+    while(not terminated and total_steps_in_episode < max_steps):
         # return the cte, heading error, curvature, velocity, dcte/dt, lookahead err
         state = get_state(env, prev_cte, path)
         xy, yaw = get_robot_xy(env.env.env.env)
@@ -132,7 +130,6 @@ def main():
         segment_rewards = 0
         num_segments = 0
         while (not terminated):
-            # print("step: ", total_steps)
             [cte, curr_yaw_err, curvature, curr_speed, dcte_dt, lookahead_err] = get_state(env, prev_cte, path)
             cte_list.append(cte)
             xy, yaw = get_robot_xy(env.env.env.env)
@@ -171,7 +168,8 @@ def main():
 
 
     df = pd.DataFrame({"x": x_list, "y": y_list, "cte_err": cte_list, "cte": actual_ctes, "rewards": segreward_list})
-    df.to_csv("test_rl_path_ddqn2-1.csv")
+    # df.to_csv("test_rl_path_ddqn_cl4_r2_ms3.csv")
+    df.to_csv("test_rl_path_ddqn_cl4_v5r2_ms3_2.csv")
     print("done")
     env.close()
     end = time.time()

@@ -120,7 +120,7 @@ if __name__ == '__main__':
     start_idx = np.random.randint(0, max_start_idx)
     goal_idx = start_idx + int(0.2 * 5000) 
 
-    start, goal, path = get_path("random")
+    start, goal, path, _ = get_path("random")
     # print(path[:, start_idx], path[:, goal_idx])
     plt.figure()
     plt.plot(path[0], path[1])
@@ -129,4 +129,4 @@ if __name__ == '__main__':
     plt.title("Random piecewise path")
     plt.savefig("path_check.png")
 
-    save_path(path, "test_path4.txt")
+    save_path(path, "test_path4_2.txt")
