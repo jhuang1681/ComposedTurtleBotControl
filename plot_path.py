@@ -45,10 +45,9 @@ def plot_xy_err():
 def plot_cte_err():
     fig, ax = plt.subplots()
     actual_ctes = []
-
+    closest_path_i = 0
     for i, row in data.iterrows():
-        dist_arr = np.sqrt((path[0, :] - row.x)**2 + (path[1, :]-row.y)**2)
-        closest_path_i, dist = dist_arr.argmin(), dist_arr.min()
+        closest_path_i, dist = get_closest_index(path, row.x, row.y, closest_path_i, True)
         dx_0 = path[0, closest_path_i] - row.x
         dy_0 = path[1, closest_path_i] - row.y
         # print(path[0, closest_path_i], path[1, closest_path_i], row.x, row.y)
@@ -60,9 +59,6 @@ def plot_cte_err():
     ax.text(0.1, 0.9, f"MSE = {mse:.7f}", transform=ax.transAxes)
     ax.plot(data.index, actual_ctes, 'o-', markersize=2, label="cte err")
 
-    # mse = (data["cte_err"] ** 2).mean()
-    # ax.text(0.1, 0.9, f"MSE = {mse:.7f}", transform=ax.transAxes)
-    # ax.plot(data.index, data["cte_err"], 'o-', markersize=2, label="cte err")
     ax.set_ylim(-0.8, 0.8)
     ax.legend()
     ax.grid()
@@ -120,6 +116,7 @@ if __name__ == '__main__':
         file_name = f"{args.path_type}_{kp}_{ki}_{kd}_{pid_config["horizon"]}_{pid_config["speed"]}_{args.load_path}"
         if args.load_path is not None:
             file_name=f"{args.load_path}_{args.data_file}"
+            print(file_name)
             plot_path()
             # plot_cte()
             # plot_speed()

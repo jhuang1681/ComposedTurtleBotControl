@@ -117,7 +117,7 @@ def calculate_curvature(path: np.ndarray, i: int, horizon: int):
 
 def compute_reward(state):
     cte, heading_err, speed, dcte, done_goal = state
-    w = [2, 1, 0.05, 1, 0.5]
+    w = [4, 0, 0.05, 1, 0.5]
     r_cte = -w[0] * cte**2 # penalize lateral deviation
     r_heading = -w[1] * heading_err**2 # penalize misalignment
 
