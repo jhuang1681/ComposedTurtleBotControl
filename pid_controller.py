@@ -15,18 +15,42 @@ import time
 
 # The closest index and horizon logic is based off of the race car simulator from assignment 2
 # https://github.com/ucsdarclab/RaceCar
-def get_closest_index(path: np.ndarray, x: float, y: float, start_ind: float):
+def get_closest_index(path: np.ndarray, x: float, y: float, start_ind: float, is_loop: bool = False):
+    best_dist = np.inf
+
+    ind_s = [i for i in range(start_ind)]
+    ind_e = [start_ind + i for i in range(path.shape[1]-start_ind)]
+
+    if not is_loop:
+        indices = ind_e
+    else:
+        indices = [i for a in [ind_e, ind_s] for i in a]
+
+    for i in indices:
+        path_x = path[0, i]
+        path_y = path[1, i]
+
+        dist = np.sqrt((path_x - x)**2 + (path_y - y)**2)
+
+        if dist < best_dist:
+            best_dist = dist
+        else:
+            break
+    return i, best_dist
+
     dist_arr = np.sqrt((path[0, :] - x)**2 + (path[1, :]-y)**2)
     return dist_arr.argmin(), dist_arr.min()
 
-def get_horizon_xy(path: np.ndarray, current_index: float, horizon: int):
+def get_horizon_xy(path: np.ndarray, current_index: float, horizon: int, is_loop: bool=False):
     max_index = path.shape[1] - 1
     
-    if current_index + horizon > max_index:
-        index =  max_index
+    if is_loop and current_index + horizon > max_index:
+        index =  current_index + horizon - max_index
+    elif current_index + horizon > max_index:
+        index=max_index
     else:
         index = current_index + horizon
-
+    # print(current_index, index)
     return np.array([path[0, index], path[1, index]])
 
 def get_robot_xy(env):
@@ -61,7 +85,7 @@ def compute_reward(state):
     # cos(heading_err) reduces reward when pointing wrong direction
     r_speed = w[2] * speed * np.cos(heading_err) # reward speed (in right direction)
     # --- Sparse terminal rewards ---
-    r_goal = 10.0 if done_goal else 0.0
+    r_goal = 0 #10.0 if done_goal else 0.0
 
     reward_dict["total"].append(r_cte + r_heading + r_dcte + r_speed + r_goal)
     reward_dict["r_cte"].append(r_cte)
@@ -82,6 +106,9 @@ def main():
     parser.add_argument("--pid-config")
     parser.add_argument("--world", type=str, default="flat")
     parser.add_argument("--load-path", type=str, default=None)
+    parser.add_argument("--min-steps", type=int, default=0)
+    parser.add_argument("--max-steps", type=int, default=None)
+    parser.add_argument("--is-loop", type=bool, default=False)
     args = parser.parse_args()
     print("args parsed")
     with open(args.pid_config, 'r') as file:
@@ -95,7 +122,7 @@ def main():
 
     world = args.world
 
-    env=gym.make('Turtlebot4Env-v0', world_name=world, map_path=Path(f"/workspaces/cs558_proj/maps/{world}.pgm"), yaml_path=Path(f"/workspaces/cs558_proj/maps/{world}.yaml"), shuffle_on_reset=False)
+    env=gym.make('Turtlebot4Env-v0', world_name=world, map_path=Path(f"/workspaces/cs558_proj/maps/{world}.pgm"), yaml_path=Path(f"/workspaces/cs558_proj/maps/{world}.yaml"), shuffle_on_reset=False, goal_threshold=0.2)
     print("env made")
 
     start_pos, goal_pos, path, _ = get_path(pid_config["path"], args.load_path)
@@ -105,7 +132,17 @@ def main():
     kd = pid_config["kd"]
     speed = pid_config["speed"]
     horizon = pid_config["horizon"]
-
+    is_loop = args.is_loop
+    print(args.min_steps)
+    min_steps = 0
+    if args.min_steps > 0:
+        min_steps = args.min_steps
+    max_steps = np.inf
+    print(args.max_steps)
+    if args.max_steps is not None:
+        max_steps = args.max_steps
+    
+    
     state = env.reset(options={"start_pos": start_pos, "goal_pos": goal_pos})
     print("env reset")
 
@@ -132,15 +169,16 @@ def main():
     prev_cte = 0.0
     cte_err = [0]
     actual_ctes = [0]
-    while (not terminated):
+    closest_path_i = 0
+    while (i < min_steps):
         xy, yaw = get_robot_xy(env.env.env.env)
 
-        closest_path_i, dist = get_closest_index(path, xy[0], xy[1], curr_index)
-
+        closest_path_i, dist = get_closest_index(path, xy[0], xy[1], closest_path_i, is_loop)
+        print(path[:, closest_path_i], dist, xy)
         # dist = np.linalg.norm(path[:, closest_path_i] - np.array([[xy[0]], [xy[1]]]))
         dist_err.append(dist)
 
-        horizon_xy = get_horizon_xy(path, closest_path_i, horizon)
+        horizon_xy = get_horizon_xy(path, closest_path_i, horizon, is_loop)
 
         (dx, dy) = (horizon_xy - xy)
 
@@ -165,7 +203,7 @@ def main():
         cte = -np.sin(yaw) * dx + np.cos(yaw) * dy
         cte_err.append(cte-prev_cte)
 
-        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0)
+        (dx_0, dy_0) = get_horizon_xy(path, closest_path_i,0, is_loop)
         actual_cte = -np.sin(yaw) * dx_0 + np.cos(yaw) * dy_0
         actual_ctes.append(actual_cte)
         # steer = kp[0] * curr_xy_err + ki[0] * sum(xy_err) * 0.05 + kd[0] * (curr_xy_err - prev_xy_err) / 0.05
@@ -189,9 +227,15 @@ def main():
         speed_list.append(curr_speed)
         i = i+1
 
-        if xy[0] - 5 > goal_pos[0]:
-            terminated=True
-            print("Failed")
+        if dist > 0.5:
+            print("failed!")
+            break
+        # if i == max_steps:
+        #     print("max reached")
+        #     break
+        # if xy[0] - 5 > goal_pos[0]:
+        #     terminated=True
+        #     print("Failed")
 
         if i % 50 == 0:
             reward_df = pd.DataFrame(reward_dict)
